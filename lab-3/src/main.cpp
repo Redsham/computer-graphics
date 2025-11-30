@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "our_gl.h"
 #include "model.h"
 

@@ -1,5 +1,7 @@
 #include <fstream>
+#include <iostream>
 #include <sstream>
+
 #include "model.h"
 
 Model::Model(const std::string filename) {
