@@ -5,9 +5,8 @@
 #include "tgaimage.h"
 #include "math/mat.h"
 
-void lookat(vec3 eye, vec3 center, vec3 up);
-void init_perspective(double f);
-void init_viewport(int x, int y, int w, int h);
+class Camera;
+
 void init_zbuffer(int width, int height);
 
 struct IShader {
@@ -18,4 +17,4 @@ struct IShader {
 };
 
 typedef vec4 Triangle[3];
-void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer);
+void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const Camera &camera);

@@ -8,7 +8,7 @@ TGAImage::TGAImage(const int w, const int h, const int bpp, TGAColor c) : w(w), 
             set(i, j, c);
 }
 
-bool TGAImage::read_tga_file(const std::string filename) {
+bool TGAImage::read_tga_file(const std::string &filename) {
     std::ifstream in;
     in.open(filename, std::ios::binary);
     if (!in.is_open()) {
@@ -102,7 +102,7 @@ bool TGAImage::load_rle_data(std::ifstream &in) {
     return true;
 }
 
-bool TGAImage::write_tga_file(const std::string filename, const bool vflip, const bool rle) const {
+bool TGAImage::write_tga_file(const std::string &filename, const bool vflip, const bool rle) const {
     constexpr std::uint8_t developer_area_ref[4] = {0, 0, 0, 0};
     constexpr std::uint8_t extension_area_ref[4] = {0, 0, 0, 0};
     constexpr std::uint8_t footer[18] = {'T','R','U','E','V','I','S','I','O','N','-','X','F','I','L','E','.','\0'};

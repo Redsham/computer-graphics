@@ -17,7 +17,7 @@ class Model {
     TGAImage normalmap = {};
     TGAImage specularmap = {};
 public:
-    explicit Model(std::string filename);
+    explicit Model(const std::string &filename);
     int nverts() const;
     int nfaces() const;
     vec4 vert(int i) const;

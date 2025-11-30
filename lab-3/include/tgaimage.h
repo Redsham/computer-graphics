@@ -32,8 +32,8 @@ struct TGAImage {
     enum Format { GRAYSCALE=1, RGB=3, RGBA=4 };
     TGAImage() = default;
     TGAImage(int w, int h, int bpp, TGAColor c = {});
-    bool  read_tga_file(std::string filename);
-    bool write_tga_file(std::string filename, bool vflip=true, bool rle=true) const;
+    bool  read_tga_file(const std::string &filename);
+    bool write_tga_file(const std::string &filename, bool vflip=true, bool rle=true) const;
     void flip_horizontally();
     void flip_vertically();
     TGAColor get(int x, int y) const;

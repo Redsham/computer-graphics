@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
-#include <iosfwd>
+#include <initializer_list>
+#include <ostream>
 
 #include "math/vec.h"
 
@@ -10,16 +12,36 @@ struct dt;
 
 template <int R, int C>
 struct mat {
-    vec<C> R[R] = {};
+    vec<C> rows[R] = {};
+
+    mat() = default;
+
+    mat(std::initializer_list<vec<C>> init) {
+        assert(static_cast<int>(init.size()) == R);
+        std::copy(init.begin(), init.end(), rows);
+    }
+
+    mat(std::initializer_list<std::initializer_list<double>> init) {
+        assert(static_cast<int>(init.size()) == R);
+        int r = 0;
+        for (const auto &row_init : init) {
+            assert(static_cast<int>(row_init.size()) == C);
+            int c = 0;
+            for (double v : row_init) {
+                rows[r][c++] = v;
+            }
+            ++r;
+        }
+    }
 
     vec<C> &operator[](int idx) {
         assert(idx >= 0 && idx < R);
-        return R[idx];
+        return rows[idx];
     }
 
     const vec<C> &operator[](int idx) const {
         assert(idx >= 0 && idx < R);
-        return R[idx];
+        return rows[idx];
     }
 
     double det() const {
@@ -33,7 +55,7 @@ struct mat {
             if (i == row) continue;
             for (int j = 0, sj = 0; j < C; ++j) {
                 if (j == col) continue;
-                submatrix[si][sj] = R[i][j];
+                submatrix[si][sj] = rows[i][j];
                 ++sj;
             }
             ++si;
@@ -42,17 +64,17 @@ struct mat {
         return sign * submatrix.det();
     }
 
-    mat<R, C> invert_transpose() const {
-        mat<R, C> adjugate_transpose;
+    mat invert_transpose() const {
+        mat adjugate_transpose;
         for (int i = 0; i < R; ++i) {
             for (int j = 0; j < C; ++j) {
                 adjugate_transpose[i][j] = cofactor(i, j);
             }
         }
-        return adjugate_transpose / (adjugate_transpose[0] * R[0]);
+        return adjugate_transpose / (adjugate_transpose[0] * rows[0]);
     }
 
-    mat<R, C> invert() const {
+    mat invert() const {
         return invert_transpose().transpose();
     }
 
@@ -60,7 +82,7 @@ struct mat {
         mat<C, R> ret;
         for (int i = 0; i < C; ++i) {
             for (int j = 0; j < R; ++j) {
-                ret[i][j] = R[j][i];
+                ret[i][j] = rows[j][i];
             }
         }
         return ret;
@@ -84,15 +106,10 @@ inline vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
 template <int R1, int C1, int C2>
 inline mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
     mat<R1, C2> result;
-    for (int i = 0; i < R1; ++i) {
-        for (int j = 0; j < C2; ++j) {
-            double sum = 0;
-            for (int k = 0; k < C1; ++k) {
-                sum += lhs[i][k] * rhs[k][j];
-            }
-            result[i][j] = sum;
-        }
-    }
+    for (int i = 0; i < R1; ++i)
+        for (int j = 0; j < C2; ++j)
+            for (int k = 0; k < C1; ++k)
+                result[i][j] += lhs[i][k] * rhs[k][j];
     return result;
 }
 

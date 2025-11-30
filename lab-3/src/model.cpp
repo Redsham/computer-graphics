@@ -4,7 +4,7 @@
 
 #include "model.h"
 
-Model::Model(const std::string filename) {
+Model::Model(const std::string &filename) {
     std::ifstream in;
     in.open(filename, std::ifstream::in);
     if (in.fail()) return;
@@ -44,7 +44,7 @@ Model::Model(const std::string filename) {
         }
     }
     std::cerr << "# v# " << nverts() << " f# "  << nfaces() << std::endl;
-    auto load_texture = [&filename](const std::string suffix, TGAImage &img) {
+    auto load_texture = [&filename](const std::string &suffix, TGAImage &img) {
         size_t dot = filename.find_last_of(".");
         if (dot==std::string::npos) return;
         std::string texfile = filename.substr(0,dot) + suffix;

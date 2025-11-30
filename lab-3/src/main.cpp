@@ -1,29 +1,31 @@
 #include <iostream>
 
+#include "camera.h"
 #include "our_gl.h"
+#include "scene.h"
 #include "model.h"
 
-extern mat<4, 4> ModelView, Perspective;
 extern std::vector<double> zbuffer;
 
 struct PhongShader : IShader {
     const Model &model;
+    const Camera &camera;
     vec4 l; // light direction in eye coordinates
     vec2 varying_uv[3]; // triangle uv coordinates, written by the vertex shader, read by the fragment shader
     vec4 varying_nrm[3]; // normal per vertex to be interpolated by the fragment shader
     vec4 tri[3]; // triangle in view coordinates
 
-    PhongShader(const vec3 light, const Model &m) : model(m) {
-        l = normalized((ModelView * vec4{light.x, light.y, light.z, 0.}));
+    PhongShader(const vec3 &light, const Model &m, const Camera &cam) : model(m), camera(cam) {
+        l = normalized((camera.model_view() * vec4{light.x, light.y, light.z, 0.}));
         // transform the light vector to view coordinates
     }
 
     virtual vec4 vertex(const int face, const int vert) {
         varying_uv[vert] = model.uv(face, vert);
-        varying_nrm[vert] = ModelView.invert_transpose() * model.normal(face, vert);
-        vec4 gl_Position = ModelView * model.vert(face, vert);
+        varying_nrm[vert] = camera.model_view().invert_transpose() * model.normal(face, vert);
+        vec4 gl_Position = camera.model_view() * model.vert(face, vert);
         tri[vert] = gl_Position;
-        return Perspective * gl_Position; // in clip coordinates
+        return camera.perspective() * gl_Position; // in clip coordinates
     }
 
     virtual std::pair<bool, TGAColor> fragment(const vec3 bar) const {
@@ -57,22 +59,15 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    constexpr int width = 800;
-    constexpr int height = 800;
-    constexpr vec3 light{1, 1, 1};
-    constexpr vec3 eye{-1, 0, 2};
-    constexpr vec3 center{0, 0, 0};
-    constexpr vec3 up{0, 1, 0};
+    Scene scene{};
+    scene.apply_camera();
 
-    lookat(eye, center, up);
-    init_perspective(norm(eye - center));
-    init_viewport(width / 16, height / 16, width * 7 / 8, height * 7 / 8);
-    init_zbuffer(width, height);
-    TGAImage framebuffer(width, height, TGAImage::RGB, {177, 195, 209, 255});
+    init_zbuffer(scene.width, scene.height);
+    TGAImage framebuffer(scene.width, scene.height, TGAImage::RGB, scene.background);
 
     for (int m = 1; m < argc; m++) {
         Model model(argv[m]);
-        PhongShader shader(light, model);
+        PhongShader shader(scene.light, model, scene.camera);
 
         for (int f = 0; f < model.nfaces(); f++) {
 
@@ -82,7 +77,7 @@ int main(int argc, char **argv) {
                 shader.vertex(f, 2)
             };
 
-            rasterize(clip, shader, framebuffer);
+            rasterize(clip, shader, framebuffer, scene.camera);
         }
     }
 
