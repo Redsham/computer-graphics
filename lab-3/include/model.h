@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "geometry.h"
 #include "tgaimage.h"
+#include "math/vector.h"
 
 class Model {
     std::vector<vec4> verts = {};    // array of vertices        ┐ generally speaking, these arrays

@@ -1,15 +1,17 @@
 #include <algorithm>
 #include "our_gl.h"
 
-mat<4, 4> ModelView, Viewport, Perspective;
+#include "math/matrix.h"
+
+mat4 ModelView, Viewport, Perspective;
 std::vector<double> zbuffer;
 
 void lookat(const vec3 eye, const vec3 center, const vec3 up) {
     vec3 n = normalized(eye - center);
     vec3 l = normalized(cross(up, n));
     vec3 m = normalized(cross(n, l));
-    ModelView = mat<4, 4>{{{l.x, l.y, l.z, 0}, {m.x, m.y, m.z, 0}, {n.x, n.y, n.z, 0}, {0, 0, 0, 1}}} *
-                mat<4, 4>{{{1, 0, 0, -center.x}, {0, 1, 0, -center.y}, {0, 0, 1, -center.z}, {0, 0, 0, 1}}};
+    ModelView = mat4{{{l.x, l.y, l.z, 0}, {m.x, m.y, m.z, 0}, {n.x, n.y, n.z, 0}, {0, 0, 0, 1}}} *
+                mat4{{{1, 0, 0, -center.x}, {0, 1, 0, -center.y}, {0, 0, 1, -center.z}, {0, 0, 0, 1}}};
 }
 
 void init_perspective(const double f) {
@@ -28,13 +30,13 @@ void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffe
     vec4 ndc[3] = {clip[0] / clip[0].w, clip[1] / clip[1].w, clip[2] / clip[2].w};
     vec2 screen[3] = {(Viewport * ndc[0]).xy(), (Viewport * ndc[1]).xy(), (Viewport * ndc[2]).xy()};
 
-    mat<3, 3> ABC = {{{screen[0].x, screen[0].y, 1.}, {screen[1].x, screen[1].y, 1.}, {screen[2].x, screen[2].y, 1.}}};
+    mat3 ABC = {{{screen[0].x, screen[0].y, 1.}, {screen[1].x, screen[1].y, 1.}, {screen[2].x, screen[2].y, 1.}}};
     if (ABC.det() < 1) return; // backface culling + discarding triangles that cover less than a pixel
 
     auto [bbminx,bbmaxx] = std::minmax({screen[0].x, screen[1].x, screen[2].x}); // bounding box for the triangle
     auto [bbminy,bbmaxy] = std::minmax({screen[0].y, screen[1].y, screen[2].y});
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int x = std::max<int>(bbminx, 0); x <= std::min<int>(bbmaxx, framebuffer.width() - 1); x++) {
         for (int y = std::max<int>(bbminy, 0); y <= std::min<int>(bbmaxy, framebuffer.height() - 1); y++) {
             vec3 bc_screen = ABC.invert_transpose() * vec3{static_cast<double>(x), static_cast<double>(y), 1.};

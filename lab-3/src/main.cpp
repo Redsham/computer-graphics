@@ -1,5 +1,8 @@
+#include <iostream>
+
 #include "our_gl.h"
 #include "model.h"
+#include "math/matrix.h"
 
 extern mat<4, 4> ModelView, Perspective;
 extern std::vector<double> zbuffer;
