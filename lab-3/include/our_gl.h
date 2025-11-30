@@ -1,7 +1,7 @@
 #pragma once
 
 #include "tgaimage.h"
-#include "math/vector.h"
+#include "geometry.h"
 
 void lookat(vec3 eye, vec3 center, vec3 up);
 void init_perspective(double f);

@@ -2,8 +2,6 @@
 #include <sstream>
 #include "model.h"
 
-#include <iostream>
-
 Model::Model(const std::string filename) {
     std::ifstream in;
     in.open(filename, std::ifstream::in);
