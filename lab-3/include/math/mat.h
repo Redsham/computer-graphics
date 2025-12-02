@@ -90,12 +90,12 @@ struct mat {
 };
 
 template <int R, int C>
-inline vec<C> operator*(const vec<R> &lhs, const mat<R, C> &rhs) {
+ vec<C> operator*(const vec<R> &lhs, const mat<R, C> &rhs) {
     return (mat<1, R>{{lhs}} * rhs)[0];
 }
 
 template <int R, int C>
-inline vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
+ vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
     vec<R> ret;
     for (int i = 0; i < R; ++i) {
         ret[i] = lhs[i] * rhs;
@@ -104,7 +104,7 @@ inline vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
 }
 
 template <int R1, int C1, int C2>
-inline mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
+ mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
     mat<R1, C2> result;
     for (int i = 0; i < R1; ++i)
         for (int j = 0; j < C2; ++j)
@@ -114,7 +114,7 @@ inline mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
 }
 
 template <int R, int C>
-inline mat<R, C> operator*(const mat<R, C> &lhs, double val) {
+ mat<R, C> operator*(const mat<R, C> &lhs, double val) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         result[i] = lhs[i] * val;
@@ -123,7 +123,7 @@ inline mat<R, C> operator*(const mat<R, C> &lhs, double val) {
 }
 
 template <int R, int C>
-inline mat<R, C> operator/(const mat<R, C> &lhs, double val) {
+ mat<R, C> operator/(const mat<R, C> &lhs, double val) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         result[i] = lhs[i] / val;
@@ -132,7 +132,7 @@ inline mat<R, C> operator/(const mat<R, C> &lhs, double val) {
 }
 
 template <int R, int C>
-inline mat<R, C> operator+(const mat<R, C> &lhs, const mat<R, C> &rhs) {
+ mat<R, C> operator+(const mat<R, C> &lhs, const mat<R, C> &rhs) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         for (int j = 0; j < C; ++j) {
@@ -143,7 +143,7 @@ inline mat<R, C> operator+(const mat<R, C> &lhs, const mat<R, C> &rhs) {
 }
 
 template <int R, int C>
-inline mat<R, C> operator-(const mat<R, C> &lhs, const mat<R, C> &rhs) {
+ mat<R, C> operator-(const mat<R, C> &lhs, const mat<R, C> &rhs) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         for (int j = 0; j < C; ++j) {
@@ -154,7 +154,7 @@ inline mat<R, C> operator-(const mat<R, C> &lhs, const mat<R, C> &rhs) {
 }
 
 template <int R, int C>
-inline std::ostream &operator<<(std::ostream &out, const mat<R, C> &m) {
+ std::ostream &operator<<(std::ostream &out, const mat<R, C> &m) {
     for (int i = 0; i < R; ++i) {
         out << m[i] << std::endl;
     }

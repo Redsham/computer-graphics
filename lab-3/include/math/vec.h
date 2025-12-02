@@ -4,7 +4,6 @@
 #include <cmath>
 #include <iosfwd>
 
-// Fixed-size vector with named components for 2D/3D/4D.
 template <int N>
 struct vec {
     double data[N]{}; // zero-initialized
@@ -85,7 +84,7 @@ using vec3 = vec<3>;
 using vec4 = vec<4>;
 
 template <int N>
-inline double operator*(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+ double operator*(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     double ret = 0;
     for (int i = 0; i < N; ++i) {
         ret += lhs[i] * rhs[i];
@@ -94,7 +93,7 @@ inline double operator*(const vec<N> &lhs, const vec<N> &rhs) noexcept {
 }
 
 template <int N>
-inline vec<N> operator+(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+ vec<N> operator+(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] += rhs[i];
@@ -103,7 +102,7 @@ inline vec<N> operator+(const vec<N> &lhs, const vec<N> &rhs) noexcept {
 }
 
 template <int N>
-inline vec<N> operator-(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+ vec<N> operator-(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] -= rhs[i];
@@ -112,7 +111,7 @@ inline vec<N> operator-(const vec<N> &lhs, const vec<N> &rhs) noexcept {
 }
 
 template <int N>
-inline vec<N> operator*(const vec<N> &lhs, double rhs) noexcept {
+ vec<N> operator*(const vec<N> &lhs, double rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] *= rhs;
@@ -121,12 +120,12 @@ inline vec<N> operator*(const vec<N> &lhs, double rhs) noexcept {
 }
 
 template <int N>
-inline vec<N> operator*(double lhs, const vec<N> &rhs) noexcept {
+ vec<N> operator*(double lhs, const vec<N> &rhs) noexcept {
     return rhs * lhs;
 }
 
 template <int N>
-inline vec<N> operator/(const vec<N> &lhs, double rhs) noexcept {
+ vec<N> operator/(const vec<N> &lhs, double rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] /= rhs;
@@ -135,7 +134,7 @@ inline vec<N> operator/(const vec<N> &lhs, double rhs) noexcept {
 }
 
 template <int N>
-inline std::ostream &operator<<(std::ostream &out, const vec<N> &v) {
+ std::ostream &operator<<(std::ostream &out, const vec<N> &v) {
     for (int i = 0; i < N; ++i) {
         out << v[i] << " ";
     }
@@ -143,12 +142,12 @@ inline std::ostream &operator<<(std::ostream &out, const vec<N> &v) {
 }
 
 template <int N>
-inline double norm(const vec<N> &v) {
+ double norm(const vec<N> &v) {
     return std::sqrt(v * v);
 }
 
 template <int N>
-inline vec<N> normalized(const vec<N> &v) {
+ vec<N> normalized(const vec<N> &v) {
     return v / norm(v);
 }
 
