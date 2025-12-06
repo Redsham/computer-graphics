@@ -12,7 +12,7 @@ struct Scene {
 
     // --- Light parameters ---
     vec3 light{1, 1, 1};
-    TGAColor background{177, 195, 209, 255};
+    TGAColor background{0, 0, 40, 255};
 
     // --- Camera parameters ---
     vec3 eye{-1, 0, 2};

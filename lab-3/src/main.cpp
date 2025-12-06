@@ -16,7 +16,7 @@ int main(const int argc, char **argv) {
     scene.apply_camera();
     const mat4 viewport = scene.camera.viewport();
 
-    Gl_Globals::init(scene.width, scene.height);
+    Gl_Globals::init(scene.width, scene.height, scene.background);
 
     for (int m = 1; m < argc; m++) {
         Model model(argv[m]);

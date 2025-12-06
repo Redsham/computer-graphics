@@ -6,8 +6,8 @@
 TGAImage Gl_Globals::FRAME_BUFFER;
 std::vector<double> Gl_Globals::Z_BUFFER;
 
-void Gl_Globals::init(int width, int height) {
-    FRAME_BUFFER = TGAImage(width, height, TGAImage::RGB);
+void Gl_Globals::init(const int width, const int height, const TGAColor clear_color) {
+    FRAME_BUFFER = TGAImage(width, height, TGAImage::RGB, clear_color);
     Z_BUFFER = std::vector(width * height, -1000.);
 }
 

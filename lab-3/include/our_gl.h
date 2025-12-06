@@ -12,7 +12,7 @@ struct Gl_Globals {
     static TGAImage FRAME_BUFFER;
     static std::vector<double> Z_BUFFER;
 
-    static void init(int width, int height);
+    static void init(int width, int height, TGAColor clear_color);
 };
 
 struct IShader {
