@@ -1,9 +1,9 @@
 #include "camera.h"
 
 void Camera::lookat(const vec3 &eye, const vec3 &center, const vec3 &up) {
-    vec3 n = normalized(eye - center);
-    vec3 l = normalized(cross(up, n));
-    vec3 m = normalized(cross(n, l));
+    const vec3 n = normalized(eye - center);
+    const vec3 l = normalized(cross(up, n));
+    const vec3 m = normalized(cross(n, l));
     model_view_ = mat4{{l.x, l.y, l.z, 0}, {m.x, m.y, m.z, 0}, {n.x, n.y, n.z, 0}, {0, 0, 0, 1}} *
                   mat4{{1, 0, 0, -center.x}, {0, 1, 0, -center.y}, {0, 0, 1, -center.z}, {0, 0, 0, 1}};
 }

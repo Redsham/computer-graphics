@@ -3,11 +3,13 @@
 #include "camera.h"
 #include "our_gl.h"
 
-std::vector<double> zbuffer;
+std::vector<double> Gl_Globals::Z_BUFFER;
 
-void init_zbuffer(const int width, const int height) {
-    zbuffer = std::vector(width * height, -1000.);
+void Gl_Globals::init(int width, int height) {
+    FRAME_BUFFER = TGAImage(width, height, TGAImage::RGB);
+    Z_BUFFER = std::vector(width * height, -1000.);
 }
+
 
 void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const Camera &camera) {
     vec4 ndc[3] = {clip[0] / clip[0].w, clip[1] / clip[1].w, clip[2] / clip[2].w};
@@ -30,11 +32,11 @@ void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffe
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0) continue;
 
             double z = bc_screen * vec3{ndc[0].z, ndc[1].z, ndc[2].z};
-            if (z <= zbuffer[x + y * framebuffer.width()]) continue;
+            if (z <= Gl_Globals::Z_BUFFER[x + y * framebuffer.width()]) continue;
 
             auto [discard, color] = shader.fragment(bc_clip);
             if (discard) continue;
-            zbuffer[x + y * framebuffer.width()] = z;
+            Gl_Globals::Z_BUFFER[x + y * framebuffer.width()] = z;
             framebuffer.set(x, y, color);
         }
     }

@@ -1,18 +1,27 @@
 #pragma once
 
 #include <utility>
+#include <vector>
 
 #include "tgaimage.h"
 #include "math/mat.h"
 
 class Camera;
 
-void init_zbuffer(int width, int height);
+struct Gl_Globals {
+    static TGAImage FRAME_BUFFER;
+    static std::vector<double> Z_BUFFER;
+
+    static void init(int width, int height);
+};
 
 struct IShader {
+    virtual         ~IShader() = default;
+    
     static TGAColor sample2D(const TGAImage &img, const vec2 &uvf) {
         return img.get(uvf[0] * img.width(), uvf[1] * img.height());
     }
+
     virtual std::pair<bool, TGAColor> fragment(vec3 bar) const = 0;
 };
 
