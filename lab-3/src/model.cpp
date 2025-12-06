@@ -69,7 +69,7 @@ Model::Model(const std::string &filename) {
     // Vertices, normals, texture coordinates
     for (unsigned i = 0; i < mesh->mNumVertices; i++) {
         const aiVector3D v = mesh->mVertices[i];
-        vertices.push_back(vec4{v.x, v.y, v.z, 0.0f});
+        vertices.push_back(vec4{v.x, v.y, v.z, 1.0f});
 
         const aiVector3D n = mesh->mNormals[i];
         normals.push_back(normalized(vec4{n.x, n.y, n.z}));
