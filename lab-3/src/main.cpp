@@ -4,6 +4,8 @@
 #include "our_gl.h"
 #include "scene.h"
 #include "model.h"
+#include "primitives.h"
+#include "shaders/ghost_shader.h"
 #include "shaders/phong_shader.h"
 
 int main(const int argc, char **argv) {
@@ -18,11 +20,35 @@ int main(const int argc, char **argv) {
 
     Gl_Globals::init(scene.width, scene.height, scene.background);
 
+    // Load models
+    std::vector<Model*> models;
     for (int m = 1; m < argc; m++) {
-        Model model(argv[m]);
-        PhongShader shader(scene.light, model, scene.camera);
+        auto model = new Model{argv[m]};
+        model->set_shader(new PhongShader{scene.light, *model, scene.camera});
+        models.push_back(model);
+    }
 
-        for (int f = 0; f < model.nfaces(); f++) {
+    // Procedural models
+    vec3 min, max;
+    models[0]->bounds(min, max);
+    std::cout << "Model bounds: min(" << min.x << ", " << min.y << ", " << min.z << ") "
+              << "max(" << max.x << ", " << max.y << ", " << max.z << ")" << std::endl;
+
+    auto cube = Primitives::box(min, max);
+    cube.set_shader(new GhostShader{cube, scene.camera});
+    cube.set_color({0, 0, 255, 50});
+    models.push_back(&cube);
+
+
+    // Render models
+    for (const auto model : models) {
+        if (!model->has_shader()) {
+            std::cerr << "Model has no shader assigned!" << std::endl;
+            continue;
+        }
+        IShader &shader = model->get_shader();
+
+        for (int f = 0; f < static_cast<int>(model->nfaces()); f++) {
             Triangle clip = {
                 shader.vertex(f, 0),
                 shader.vertex(f, 1),

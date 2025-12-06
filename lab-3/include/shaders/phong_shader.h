@@ -7,7 +7,7 @@
 #include "../camera.h"
 #include "../our_gl.h"
 
-struct PhongShader : IShader {
+struct PhongShader final : IShader {
     const Model & model;
     const Camera &camera;
     vec4          l;
@@ -17,7 +17,7 @@ struct PhongShader : IShader {
 
     PhongShader(const vec3 &light, const Model &m, const Camera &cam) : model(m), camera(cam) { l = normalized((camera.model_view() * vec4{light.x, light.y, light.z, 0.})); }
 
-    virtual vec4 vertex(const int face, const int vert) {
+    vec4 vertex(const int face, const int vert) override {
         varying_uv[vert]       = model.uv(face, vert);
         varying_nrm[vert]      = camera.model_view().invert_transpose() * model.normal(face, vert);
         const vec4 gl_Position = camera.model_view() * model.vert(face, vert);
@@ -25,7 +25,7 @@ struct PhongShader : IShader {
         return camera.perspective() * gl_Position;
     }
 
-    [[nodiscard]] std::pair<bool, TGAColor> fragment(const vec3 bar) const override {
+    [[nodiscard]] std::pair<bool, TGAColor> fragment(const vec3 bar) override {
         const mat<2, 4> E = {tri[1] - tri[0], tri[2] - tri[0]};
         const mat<2, 2> U = {varying_uv[1] - varying_uv[0], varying_uv[2] - varying_uv[0]};
         const mat<2, 4> T = U.invert() * E;
@@ -49,6 +49,7 @@ struct PhongShader : IShader {
         for (const int channel: {0, 1, 2})
             gl_FragColor[channel] = std::min<int>(255, static_cast<int>(gl_FragColor[channel] * (ambient + diffuse + specular)));
 
+        gl_FragColor[3] = 255;
         return {false, gl_FragColor};
     }
 };

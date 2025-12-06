@@ -101,6 +101,21 @@ Model::Model(const std::string &filename) {
     std::cout << "Loaded model: " << filename << " (" << debug_info() << ")" << std::endl;
 }
 
+Model::Model(std::vector<vec4> v,
+             std::vector<vec4> n,
+             std::vector<vec2> uvs_in,
+             std::vector<int> indices) {
+
+    vertices = std::move(v);
+    normals  = std::move(n);
+    uvs      = std::move(uvs_in);
+
+    facet_vrt = std::move(indices);
+
+    if (facet_nrm.empty()) facet_nrm = facet_vrt;
+    if (facet_tex.empty()) facet_tex = facet_vrt;
+}
+
 vec4 Model::normal(const vec2 &uv) const {
     if (normal_map.width() == 0 || normal_map.height() == 0)
         return vec4{0, 0, 1, 0 };
@@ -113,6 +128,24 @@ vec4 Model::normal(const vec2 &uv) const {
         0.0f
     });
 }
+
+void Model::bounds(vec3 &min, vec3 &max) const {
+    if (vertices.empty()) return;
+
+    min = vec3{vertices[0].x, vertices[0].y, vertices[0].z};
+    max = vec3{vertices[0].x, vertices[0].y, vertices[0].z};
+
+    for (const auto &v : vertices) {
+        if (v.x < min.x) min.x = v.x;
+        if (v.y < min.y) min.y = v.y;
+        if (v.z < min.z) min.z = v.z;
+
+        if (v.x > max.x) max.x = v.x;
+        if (v.y > max.y) max.y = v.y;
+        if (v.z > max.z) max.z = v.z;
+    }
+}
+
 
 std::string Model::debug_info() const {
     std::string str = "vertices: " + std::to_string(vertices.size()) +

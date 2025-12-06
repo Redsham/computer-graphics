@@ -22,8 +22,9 @@ struct IShader {
         return img.get(uvf[0] * img.width(), uvf[1] * img.height());
     }
 
-    virtual std::pair<bool, TGAColor> fragment(vec3 bar) const = 0;
+    [[nodiscard]] virtual vec4 vertex(int face, int vert) = 0;
+    [[nodiscard]] virtual std::pair<bool, TGAColor> fragment(vec3 bar) = 0;
 };
 
 typedef vec4 Triangle[3];
-void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const mat4 &viewport);
+void rasterize(const Triangle &clip, IShader &shader, TGAImage &framebuffer, const mat4 &viewport);
