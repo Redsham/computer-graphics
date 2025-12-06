@@ -26,4 +26,4 @@ struct IShader {
 };
 
 typedef vec4 Triangle[3];
-void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const Camera &camera);
+void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const mat4 &viewport);

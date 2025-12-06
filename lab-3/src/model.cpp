@@ -11,6 +11,7 @@ static std::string parentDir(const std::string &path) {
     if (slash == std::string::npos) return "";
     return path.substr(0, slash + 1);
 }
+
 static bool load_tga(const std::string &directory, const aiString &path, TGAImage &img) {
     if (path.length == 0) return false;
 
@@ -30,16 +31,16 @@ void Model::load_textures(const std::string &objPath, const aiMaterial *material
 
     // Diffuse map
     if (material->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS)
-        load_tga(dir, path, diffusemap);
+        load_tga(dir, path, diffuse_map);
 
     // Normal map
     if (material->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS ||
         material->GetTexture(aiTextureType_HEIGHT, 0, &path) == AI_SUCCESS)
-        load_tga(dir, path, normalmap);
+        load_tga(dir, path, normal_map);
 
     // Specular map
     if (material->GetTexture(aiTextureType_SPECULAR, 0, &path) == AI_SUCCESS)
-        load_tga(dir, path, specularmap);
+        load_tga(dir, path, specular_map);
 }
 
 Model::Model(const std::string &filename) {
@@ -60,23 +61,24 @@ Model::Model(const std::string &filename) {
 
     const aiMesh *mesh = scene->mMeshes[0];
 
-    verts.reserve(mesh->mNumVertices);
-    norms.reserve(mesh->mNumVertices);
-    tex.reserve(mesh->mNumVertices);
+    // Allocate memory
+    vertices.reserve(mesh->mNumVertices);
+    normals.reserve(mesh->mNumVertices);
+    uvs.reserve(mesh->mNumVertices);
 
     // Vertices, normals, texture coordinates
     for (unsigned i = 0; i < mesh->mNumVertices; i++) {
-        aiVector3D v = mesh->mVertices[i];
-        verts.push_back(vec4{v.x, v.y, v.z, 1});
+        const aiVector3D v = mesh->mVertices[i];
+        vertices.push_back(vec4{v.x, v.y, v.z, 0.0f});
 
-        aiVector3D n = mesh->mNormals[i];
-        norms.push_back(normalized(vec4{n.x, n.y, n.z, 0}));
+        const aiVector3D n = mesh->mNormals[i];
+        normals.push_back(normalized(vec4{n.x, n.y, n.z}));
 
         if (mesh->mTextureCoords[0]) {
-            aiVector3D uv = mesh->mTextureCoords[0][i];
-            tex.push_back({uv.x, 1.f - uv.y});
+            const aiVector3D uv = mesh->mTextureCoords[0][i];
+            uvs.push_back({uv.x, 1.f - uv.y});
         } else {
-            tex.push_back({0, 0});
+            uvs.push_back({0, 0});
         }
     }
 
@@ -96,29 +98,29 @@ Model::Model(const std::string &filename) {
         load_textures(filename, scene->mMaterials[mesh->mMaterialIndex]);
     }
 
-    std::cout << "===============================" << std::endl;
-    std::cout << "Model successfully loaded: " << filename << std::endl;
-
-    std::cout << std::endl << "Stats: " << std::endl;
-    std::cout << "Vertices: " << nverts() << std::endl;
-    std::cout << "Faces:    " << nfaces() << std::endl;
-
-    std::cout << std::endl << "Textures: " << std::endl;
-    std::cout << "Diffuse:  " << (diffusemap.width() > 0 ? "yes" : "no") << std::endl;
-    std::cout << "Normal:   " << (normalmap.width() > 0 ? "yes" : "no") << std::endl;
-    std::cout << "Specular: " << (specularmap.width() > 0 ? "yes" : "no") << std::endl;
-    std::cout << "===============================" << std::endl;
+    std::cout << "Loaded model: " << filename << " (" << debug_info() << ")" << std::endl;
 }
 
 vec4 Model::normal(const vec2 &uv) const {
-    if (normalmap.width() == 0 || normalmap.height() == 0)
-        return vec4{0, 0, 1, 0};
+    if (normal_map.width() == 0 || normal_map.height() == 0)
+        return vec4{0, 0, 1, 0 };
 
-    TGAColor c = normalmap.get(uv.x * normalmap.width(), uv.y * normalmap.height());
+    TGAColor c = normal_map.get(uv.x * normal_map.width(), uv.y * normal_map.height());
     return normalized(vec4{
         static_cast<double>(c[2]) * 2.0 / 255.0 - 1.0,
         static_cast<double>(c[1]) * 2.0 / 255.0 - 1.0,
         static_cast<double>(c[0]) * 2.0 / 255.0 - 1.0,
-        0
+        0.0f
     });
+}
+
+std::string Model::debug_info() const {
+    std::string str = "vertices: " + std::to_string(vertices.size()) +
+                      ", normals: " + std::to_string(normals.size()) +
+                      ", uvs: " + std::to_string(uvs.size()) +
+                      ", faces: " + std::to_string(nfaces()) +
+                      ", diffuse map: " + (diffuse_map.width() > 0 ? "yes" : "no") +
+                      ", normal map: " + (normal_map.width() > 0 ? "yes" : "no") +
+                      ", specular map: " + (specular_map.width() > 0 ? "yes" : "no");
+    return str;
 }

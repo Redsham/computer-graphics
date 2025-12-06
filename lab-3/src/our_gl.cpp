@@ -3,6 +3,7 @@
 #include "camera.h"
 #include "our_gl.h"
 
+TGAImage Gl_Globals::FRAME_BUFFER;
 std::vector<double> Gl_Globals::Z_BUFFER;
 
 void Gl_Globals::init(int width, int height) {
@@ -11,14 +12,14 @@ void Gl_Globals::init(int width, int height) {
 }
 
 
-void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const Camera &camera) {
-    vec4 ndc[3] = {clip[0] / clip[0].w, clip[1] / clip[1].w, clip[2] / clip[2].w};
-    vec2 screen[3] = {(camera.viewport() * ndc[0]).xy(), (camera.viewport() * ndc[1]).xy(), (camera.viewport() * ndc[2]).xy()};
+void rasterize(const Triangle &clip, const IShader &shader, TGAImage &framebuffer, const mat4 &viewport) {
+    const vec4 ndc[3] = {clip[0] / clip[0].w, clip[1] / clip[1].w, clip[2] / clip[2].w};
+    vec2 screen[3] = {(viewport * ndc[0]).xy(), (viewport * ndc[1]).xy(), (viewport * ndc[2]).xy()};
 
-    mat<3, 3> ABC = {{{screen[0].x, screen[0].y, 1.}, {screen[1].x, screen[1].y, 1.}, {screen[2].x, screen[2].y, 1.}}};
-    if (ABC.det() < 1) return; // backface culling + discarding triangles that cover less than a pixel
+    const mat<3, 3> ABC = {{{screen[0].x, screen[0].y, 1.}, {screen[1].x, screen[1].y, 1.}, {screen[2].x, screen[2].y, 1.0f}}};
+    if (ABC.det() < 1) return;
 
-    auto [bbminx,bbmaxx] = std::minmax({screen[0].x, screen[1].x, screen[2].x}); // bounding box for the triangle
+    auto [bbminx,bbmaxx] = std::minmax({screen[0].x, screen[1].x, screen[2].x});
     auto [bbminy,bbmaxy] = std::minmax({screen[0].y, screen[1].y, screen[2].y});
 
     #pragma omp parallel for

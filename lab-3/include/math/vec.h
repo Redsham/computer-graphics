@@ -4,9 +4,9 @@
 #include <cmath>
 #include <iosfwd>
 
-template <int N>
+template<int N>
 struct vec {
-    double data[N]{}; // zero-initialized
+    double data[N]{};
 
     double &operator[](int i) noexcept {
         assert(i >= 0 && i < N);
@@ -19,7 +19,7 @@ struct vec {
     }
 };
 
-template <>
+template<>
 struct vec<2> {
     double x = 0;
     double y = 0;
@@ -35,7 +35,7 @@ struct vec<2> {
     }
 };
 
-template <>
+template<>
 struct vec<3> {
     double x = 0;
     double y = 0;
@@ -52,7 +52,7 @@ struct vec<3> {
     }
 };
 
-template <>
+template<>
 struct vec<4> {
     double x = 0;
     double y = 0;
@@ -75,16 +75,16 @@ struct vec<4> {
         return w;
     }
 
-    vec<2> xy() const noexcept { return {x, y}; }
-    vec<3> xyz() const noexcept { return {x, y, z}; }
+    [[nodiscard]] vec<2> xy() const noexcept { return {x, y}; }
+    [[nodiscard]] vec<3> xyz() const noexcept { return {x, y, z}; }
 };
 
 using vec2 = vec<2>;
 using vec3 = vec<3>;
 using vec4 = vec<4>;
 
-template <int N>
- double operator*(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+template<int N>
+double operator*(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     double ret = 0;
     for (int i = 0; i < N; ++i) {
         ret += lhs[i] * rhs[i];
@@ -92,8 +92,8 @@ template <int N>
     return ret;
 }
 
-template <int N>
- vec<N> operator+(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+template<int N>
+vec<N> operator+(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] += rhs[i];
@@ -101,8 +101,8 @@ template <int N>
     return ret;
 }
 
-template <int N>
- vec<N> operator-(const vec<N> &lhs, const vec<N> &rhs) noexcept {
+template<int N>
+vec<N> operator-(const vec<N> &lhs, const vec<N> &rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] -= rhs[i];
@@ -110,8 +110,8 @@ template <int N>
     return ret;
 }
 
-template <int N>
- vec<N> operator*(const vec<N> &lhs, double rhs) noexcept {
+template<int N>
+vec<N> operator*(const vec<N> &lhs, double rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] *= rhs;
@@ -119,13 +119,13 @@ template <int N>
     return ret;
 }
 
-template <int N>
- vec<N> operator*(double lhs, const vec<N> &rhs) noexcept {
+template<int N>
+vec<N> operator*(double lhs, const vec<N> &rhs) noexcept {
     return rhs * lhs;
 }
 
-template <int N>
- vec<N> operator/(const vec<N> &lhs, double rhs) noexcept {
+template<int N>
+vec<N> operator/(const vec<N> &lhs, double rhs) noexcept {
     vec<N> ret = lhs;
     for (int i = 0; i < N; ++i) {
         ret[i] /= rhs;
@@ -133,21 +133,21 @@ template <int N>
     return ret;
 }
 
-template <int N>
- std::ostream &operator<<(std::ostream &out, const vec<N> &v) {
+template<int N>
+std::ostream &operator<<(std::ostream &out, const vec<N> &v) {
     for (int i = 0; i < N; ++i) {
         out << v[i] << " ";
     }
     return out;
 }
 
-template <int N>
- double norm(const vec<N> &v) {
+template<int N>
+double norm(const vec<N> &v) {
     return std::sqrt(v * v);
 }
 
-template <int N>
- vec<N> normalized(const vec<N> &v) {
+template<int N>
+vec<N> normalized(const vec<N> &v) {
     return v / norm(v);
 }
 
