@@ -1,6 +1,6 @@
 //
 //  AppDelegate.swift
-//  MetalTutorial
+//  Metal-Cube
 //
 //  Created by Samuliak on 03/11/2023.
 //

@@ -5,6 +5,10 @@ func toRadians(from angle: Float) -> Float {
     return angle * .pi / 180.0;
 }
 
+func toRadians(from rotation: simd_float3) -> simd_float3 {
+    return simd_float3(toRadians(from: rotation.x), toRadians(from: rotation.y), toRadians(from: rotation.z));
+}
+
 func translateMatrix(matrix: inout simd_float4x4, position: simd_float3) {
     matrix[3] = matrix[0] * position.x + matrix[1] * position.y + matrix[2] * position.z + matrix[3];
 }
@@ -87,4 +91,27 @@ func createPerspectiveMatrix(fov: Float, aspectRatio: Float, nearPlane: Float, f
     matrix[3][2] = -(farPlane * nearPlane) / (farPlane - nearPlane);
     
     return matrix;
+}
+
+func rotateVectorAroundNormal(vec: simd_float3, angle: Float, normal: simd_float3) -> simd_float3 {
+    let c = cos(angle)
+    let s = sin(angle)
+
+    let axis = normalize(normal)
+    let tmp = (1.0 - c) * axis
+
+    var rotationMat = simd_float3x3(1.0)
+    rotationMat[0][0] = c + tmp[0] * axis[0]
+    rotationMat[0][1] = tmp[0] * axis[1] + s * axis[2]
+    rotationMat[0][2] = tmp[0] * axis[2] - s * axis[1]
+
+    rotationMat[1][0] = tmp[1] * axis[0] - s * axis[2]
+    rotationMat[1][1] = c + tmp[1] * axis[1]
+    rotationMat[1][2] = tmp[1] * axis[2] + s * axis[0]
+
+    rotationMat[2][0] = tmp[2] * axis[0] + s * axis[1]
+    rotationMat[2][1] = tmp[2] * axis[1] - s * axis[0]
+    rotationMat[2][2] = c + tmp[2] * axis[2]
+
+    return rotationMat * vec
 }

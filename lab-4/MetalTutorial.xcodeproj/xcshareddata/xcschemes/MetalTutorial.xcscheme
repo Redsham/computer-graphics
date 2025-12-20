@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D8B4B2D32AF573A40053AAE4"
-               BuildableName = "MetalCube.app"
-               BlueprintName = "MetalCube"
+               BuildableName = "MetalTutorial.app"
+               BlueprintName = "MetalTutorial"
                ReferencedContainer = "container:MetalTutorial.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D8B4B2D32AF573A40053AAE4"
-            BuildableName = "MetalCube.app"
-            BlueprintName = "MetalCube"
+            BuildableName = "MetalTutorial.app"
+            BlueprintName = "MetalTutorial"
             ReferencedContainer = "container:MetalTutorial.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D8B4B2D32AF573A40053AAE4"
-            BuildableName = "MetalCube.app"
-            BlueprintName = "MetalCube"
+            BuildableName = "MetalTutorial.app"
+            BlueprintName = "MetalTutorial"
             ReferencedContainer = "container:MetalTutorial.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
