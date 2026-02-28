@@ -25,6 +25,27 @@ vertex VertexOut vertexFunction(Vertex in [[stage_in]], constant float4x4& proje
     return out;
 }
 
+vertex VertexOut clothVertexFunction(Vertex in [[stage_in]], constant float4x4& projectionMatrix [[buffer(0)]], constant float4x4& viewMatrix [[buffer(1)]], constant float4x4& modelMatrix [[buffer(2)]], constant float& time [[buffer(3)]]) {
+    
+    VertexOut out;
+
+    float wave = sin(in.position.x * 0.1 + time * 2.0);
+    float strength = 10.0;
+    float3 direction = normalize(float3(1.0, 0.0, 0.2));
+
+    float3 offset = in.normal * wave * strength;
+    float3 displacedPosition = in.position + offset;
+    float4 worldPos = modelMatrix * float4(displacedPosition, 1.0);
+
+    out.worldPosition = worldPos.xyz;
+    out.position = projectionMatrix * viewMatrix * worldPos;
+    out.normal = normalize((modelMatrix * float4(direction, 0.0)).xyz);
+
+    out.texCoord = in.texCoord;
+
+    return out;
+}
+
 constant float3 lightDirection = float3(0.436436, -0.872872, 0.218218);
 constant float3 lightAmbient = float3(0.4);
 constant float3 lightDiffuse = float3(1.0);
@@ -60,3 +81,4 @@ fragment float4 fragmentFunction(VertexOut in [[stage_in]], constant float3& vie
     
     return float4(phongLighting(in.worldPosition, diffuseColor.rgb, specularColor.r, normalize(in.normal), viewPosition), 1.0);
 }
+

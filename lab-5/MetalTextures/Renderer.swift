@@ -18,9 +18,11 @@ class Renderer: NSObject, MTKViewDelegate {
     
     var library: MTLLibrary
     var vertexFunction: MTLFunction
+    var clothVertFunction: MTLFunction
     var fragmentFunction: MTLFunction
     
     var renderPipelineState: MTLRenderPipelineState?
+    var clothPipelineState: MTLRenderPipelineState?
     var depthStencilState: MTLDepthStencilState?
     
     // Models
@@ -72,6 +74,7 @@ class Renderer: NSObject, MTKViewDelegate {
         self.library = device.makeDefaultLibrary()!
         self.vertexFunction = library.makeFunction(name: "vertexFunction")!
         self.fragmentFunction = library.makeFunction(name: "fragmentFunction")!
+        self.clothVertFunction = library.makeFunction(name: "clothVertexFunction")!
         
         // Render pipeline state
         let renderPipelineStateDescriptor = MTLRenderPipelineDescriptor()
@@ -84,6 +87,19 @@ class Renderer: NSObject, MTKViewDelegate {
             self.renderPipelineState = try self.device.makeRenderPipelineState(descriptor: renderPipelineStateDescriptor)
         } catch {
             print("Failed to create render pipeline state")
+        }
+        
+        // Cloth pipeline state
+        let clothRenderPipelineStateDescriptor = MTLRenderPipelineDescriptor()
+        clothRenderPipelineStateDescriptor.vertexFunction = clothVertFunction
+        clothRenderPipelineStateDescriptor.fragmentFunction = fragmentFunction
+        clothRenderPipelineStateDescriptor.vertexDescriptor = vertexDescriptor
+        clothRenderPipelineStateDescriptor.colorAttachments[0].pixelFormat = metalKitView.colorPixelFormat
+        clothRenderPipelineStateDescriptor.depthAttachmentPixelFormat = metalKitView.depthStencilPixelFormat
+        do {
+            self.clothPipelineState = try self.device.makeRenderPipelineState(descriptor:         clothRenderPipelineStateDescriptor)
+        } catch {
+            print("Failed to create cloth render pipeline state")
         }
         
         // Depth stencil state
@@ -150,10 +166,7 @@ class Renderer: NSObject, MTKViewDelegate {
         
         // Create render command encoder
         let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-        
-        // Bind render pipeline state
-        renderEncoder.setRenderPipelineState(self.renderPipelineState!)
-        
+                
         // Bind depth stencil state
         renderEncoder.setDepthStencilState(self.depthStencilState)
         
@@ -175,9 +188,12 @@ class Renderer: NSObject, MTKViewDelegate {
         // Upload time
         var time = elapsedTime
         renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.stride, index: 1)
+        renderEncoder.setVertexBytes(&time, length: MemoryLayout<Float>.size, index: 3)
         
         // Render
-        sponzaModel?.render(renderEncoder: renderEncoder)
+        sponzaModel?.render(renderEncoder: renderEncoder,
+                            standardPipeline: self.renderPipelineState!,
+                            clothPipeline: self.clothPipelineState!)
         
         // End encoding
         renderEncoder.endEncoding()

@@ -1,14 +1,28 @@
 import MetalKit
 
+enum MaterialType {
+    case standard
+    case cloth
+}
+
 struct Material {
     var diffuseTexture: MTLTexture?
     var specularTexture: MTLTexture?
+    var type: MaterialType = .standard
     
     static var textureMap: [MDLTexture?: MTLTexture?] = [:]
     
     init(mdlMaterial: MDLMaterial?, textureLoader: MTKTextureLoader) {
         self.diffuseTexture  = loadTexture(.baseColor, mdlMaterial: mdlMaterial, textureLoader: textureLoader)
         self.specularTexture = loadTexture(.specular,  mdlMaterial: mdlMaterial, textureLoader: textureLoader)
+        
+        if let name = mdlMaterial?.name.lowercased() {
+            if name.contains("cloth") || name.contains("banner") {
+                self.type = .cloth
+            }
+            
+            print(name + ": " + String(describing: type))
+        }
     }
     
     func loadTexture(_ semantic: MDLMaterialSemantic, mdlMaterial: MDLMaterial?, textureLoader: MTKTextureLoader) -> MTLTexture? {
@@ -86,7 +100,8 @@ class Model {
         }
     }
     
-    func render(renderEncoder: MTLRenderCommandEncoder) {
+    func render(renderEncoder: MTLRenderCommandEncoder, standardPipeline: MTLRenderPipelineState,
+                clothPipeline: MTLRenderPipelineState) {
         // Create the model matrix
         var modelMatrix = matrix_identity_float4x4
         translateMatrix(matrix: &modelMatrix, position: self.position)
@@ -99,6 +114,12 @@ class Model {
             let vertexBuffer = mesh.mesh.vertexBuffers[0]
             renderEncoder.setVertexBuffer(vertexBuffer.buffer, offset: vertexBuffer.offset, index: 30)
             for (submesh, material) in zip(mesh.mesh.submeshes, mesh.materials) {
+                if material.type == .cloth {
+                                renderEncoder.setRenderPipelineState(clothPipeline)
+                            } else {
+                                renderEncoder.setRenderPipelineState(standardPipeline)
+                            }
+                
                 // Bind textures
                 renderEncoder.setFragmentTexture(material.diffuseTexture, index: 0)
                 renderEncoder.setFragmentTexture(material.specularTexture, index: 1)
