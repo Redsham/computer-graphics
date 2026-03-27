@@ -73,7 +73,7 @@ class GameViewController: NSViewController {
                     
                     self.renderer.rightJoystick.x += normX
                     self.renderer.rightJoystick.y += normY
-                }
+                                    }
             }
         }
         
