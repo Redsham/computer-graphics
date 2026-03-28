@@ -21,6 +21,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var dirLight: MtlDirectionalLight
     private var pointLights: [MtlPointLight]
     private var spotLights: [MtlSpotLight]
+    private let impulseLightSystem = ImpulsePointLightSystem()
 
     init?(metalKitView: MTKView) {
         // Bootstrap Metal device/queue and configure drawable formats.
@@ -61,6 +62,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         // Update camera movement and derive matrices.
         let deltaTime = max(Float(view.preferredFramesPerSecond > 0 ? 1.0 / Double(view.preferredFramesPerSecond) : 1.0 / 60.0), 1.0 / 240.0)
         cameraController?.update(deltaTime: deltaTime)
+        impulseLightSystem.update(deltaTime: deltaTime)
 
         let projection = createPerspectiveMatrix(
             fov: toRadians(from: 50.0),
@@ -98,7 +100,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             renderPassDescriptor: renderPassDescriptor,
             viewPosition: viewPosition,
             directional: dirLight,
-            points: pointLights,
+            points: pointLights + impulseLightSystem.makePointLights(),
             spots: spotLights,
             inverseView: viewMat.inverse,
             inverseProjection: projection.inverse
@@ -111,6 +113,13 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     func setCameraController(_ cameraController: CameraFlyController) {
         self.cameraController = cameraController
+    }
+
+    func spawnImpulseLightFromCamera() {
+        guard let cameraController else { return }
+        let spawnOffset: Float = 1.0
+        let spawnPosition = cameraController.position + cameraController.forwardVector * spawnOffset
+        impulseLightSystem.spawn(at: spawnPosition, forward: cameraController.forwardVector)
     }
 
     func setDebugPreviewMode(index: Int) {

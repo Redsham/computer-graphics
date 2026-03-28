@@ -22,12 +22,12 @@ final class CameraFlyController {
     var viewMatrix: simd_float4x4 {
         createViewMatrix(
             eyePosition: position,
-            targetPosition: position + forward,
+            targetPosition: position + forwardVector,
             upVec: simd_float3(0.0, 1.0, 0.0)
         )
     }
 
-    private var forward: simd_float3 {
+    var forwardVector: simd_float3 {
         simd_normalize(simd_float3(
             cos(pitch) * cos(yaw),
             sin(pitch),
@@ -36,7 +36,7 @@ final class CameraFlyController {
     }
 
     private var right: simd_float3 {
-        simd_normalize(simd_cross(forward, simd_float3(0.0, 1.0, 0.0)))
+        simd_normalize(simd_cross(forwardVector, simd_float3(0.0, 1.0, 0.0)))
     }
 
     init(view: MTKView, startPosition: simd_float3 = simd_float3(0.0, 4.0, 15.0)) {
@@ -56,10 +56,10 @@ final class CameraFlyController {
         let amount = speed * deltaTime
 
         if pressedKeyCodes.contains(13) { // W
-            position += forward * amount
+            position += forwardVector * amount
         }
         if pressedKeyCodes.contains(1) { // S
-            position -= forward * amount
+            position -= forwardVector * amount
         }
         if pressedKeyCodes.contains(0) { // A
             position -= right * amount

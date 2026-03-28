@@ -200,7 +200,14 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
         return float4(N * 0.5 + 0.5, 1.0);
     }
     if (previewMode == 3) {
-        return float4(depth, depth, depth, 1.0);
+        float2 ndcXY = float2(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+        float4 clipPos = float4(ndcXY, depth, 1.0);
+        float4 viewPos = invProj * clipPos;
+        viewPos /= max(viewPos.w, 1e-6);
+
+        float linearDepth = abs(viewPos.z);
+        float debugDepth = saturate(linearDepth / 5000.0);
+        return float4(debugDepth, debugDepth, debugDepth, 1.0);
     }
     if (previewMode == 4) {
         return float4(fract(abs(P) * 0.05), 1.0);

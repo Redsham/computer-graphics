@@ -64,6 +64,11 @@ class GameViewController: NSViewController {
                 96: 5   // F5 - reconstructed world position
             ]
 
+            if event.keyCode == 49, !event.isARepeat { // Space
+                renderer.spawnImpulseLightFromCamera()
+                return nil
+            }
+
             guard let mode = modeByKeyCode[event.keyCode] else { return event }
             renderer.setDebugPreviewMode(index: mode)
             print("[Renderer] Debug preview mode -> F\(mode)")
