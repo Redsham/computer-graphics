@@ -8,6 +8,9 @@ class GameViewController: NSViewController {
     var mtkView: MTKView!
     var cameraController: CameraFlyController?
     var eventMonitors: [Any] = []
+    private let hudLabel = NSTextField(labelWithString: "FPS : --\nMode: Lit")
+    private var latestFPSDisplay = "--"
+    private var latestModeDisplay = "Lit"
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -31,6 +34,18 @@ class GameViewController: NSViewController {
         }
 
         renderer = newRenderer
+        renderer.onFPSUpdate = { [weak self] fps in
+            DispatchQueue.main.async {
+                self?.latestFPSDisplay = String(format: "%.1f", fps)
+                self?.updateHUDLabel()
+            }
+        }
+        renderer.onDebugModeUpdate = { [weak self] modeName in
+            DispatchQueue.main.async {
+                self?.latestModeDisplay = modeName
+                self?.updateHUDLabel()
+            }
+        }
 
         let cameraController = CameraFlyController(view: mtkView)
         renderer.setCameraController(cameraController)
@@ -39,6 +54,8 @@ class GameViewController: NSViewController {
         renderer.mtkView(mtkView, drawableSizeWillChange: mtkView.drawableSize)
 
         mtkView.delegate = renderer
+        configureHUDLabel()
+        updateHUDLabel()
         installDebugPreviewHotkeys()
     }
 
@@ -61,8 +78,14 @@ class GameViewController: NSViewController {
                 120: 2, // F2 - albedo
                 99: 3,  // F3 - normal
                 118: 4, // F4 - depth
-                96: 5   // F5 - reconstructed world position
+                96: 5,  // F5 - reconstructed world position
+                97: 6   // F6 - wireframe
             ]
+
+            if event.keyCode == 49, !event.isARepeat { // Space
+                renderer.spawnImpulseLightFromCamera()
+                return nil
+            }
 
             guard let mode = modeByKeyCode[event.keyCode] else { return event }
             renderer.setDebugPreviewMode(index: mode)
@@ -71,5 +94,36 @@ class GameViewController: NSViewController {
         }) {
             eventMonitors.append(keyDown)
         }
+    }
+
+    private func configureHUDLabel() {
+        hudLabel.translatesAutoresizingMaskIntoConstraints = false
+        hudLabel.font = .monospacedSystemFont(ofSize: 13, weight: .medium)
+        hudLabel.textColor = NSColor(white: 0.96, alpha: 1.0)
+        hudLabel.backgroundColor = NSColor(calibratedWhite: 0.08, alpha: 0.72)
+        hudLabel.drawsBackground = true
+        hudLabel.isBordered = false
+        hudLabel.isBezeled = false
+        hudLabel.isEditable = false
+        hudLabel.lineBreakMode = .byWordWrapping
+        hudLabel.alignment = .left
+        hudLabel.wantsLayer = true
+        hudLabel.layer?.cornerRadius = 8
+        hudLabel.layer?.masksToBounds = true
+        hudLabel.setContentHuggingPriority(.required, for: .horizontal)
+        hudLabel.setContentHuggingPriority(.required, for: .vertical)
+
+        view.addSubview(hudLabel)
+
+        NSLayoutConstraint.activate([
+            hudLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
+            hudLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            hudLabel.widthAnchor.constraint(equalToConstant: 170),
+            hudLabel.heightAnchor.constraint(equalToConstant: 44)
+        ])
+    }
+
+    private func updateHUDLabel() {
+        hudLabel.stringValue = "FPS : \(latestFPSDisplay)\nMode: \(latestModeDisplay)"
     }
 }

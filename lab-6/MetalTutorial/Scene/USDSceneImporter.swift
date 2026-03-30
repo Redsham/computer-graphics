@@ -8,27 +8,18 @@ struct SceneGeometry {
     let drawCalls: [GeometryDrawCall]
 }
 
-enum SceneLightRig {
-    static func sponza() -> (MtlDirectionalLight, [MtlPointLight], [MtlSpotLight]) {
-        let directional = MtlDirectionalLight(
-            direction: simd_normalize(simd_float3(-0.25, -1.0, -0.15)),
-            color: simd_float3(1.0, 0.98, 0.95),
-            intensity: 0.55
-        )
+protocol RenderScene {
+    var ambientLight: MtlAmbientLight { get }
+    var directionalLight: MtlDirectionalLight { get }
+    var pointLights: [MtlPointLight] { get }
+    var spotLights: [MtlSpotLight] { get }
+    var geometryRendererKind: GeometryRendererKind { get }
+    var prefersOrbitingCamera: Bool { get }
+    var preferredCameraPosition: simd_float3 { get }
+    var preferredCameraYaw: Float { get }
+    var preferredCameraPitch: Float { get }
 
-        let pointLights: [MtlPointLight] = [
-            MtlPointLight(position: simd_float3(-500.0, 300.0, 0.0), color: simd_float3(1.0, 0.55, 0.32), intensity: 2.0, radius: 700.0),
-            MtlPointLight(position: simd_float3(0.0, 300.0, -400.0), color: simd_float3(0.35, 0.55, 1.0), intensity: 2.0, radius: 800.0),
-            MtlPointLight(position: simd_float3(500.0, 300.0, 150.0), color: simd_float3(1.0, 0.8, 0.45), intensity: 2.0, radius: 700.0),
-            MtlPointLight(position: simd_float3(0.0, 500.0, 600.0), color: simd_float3(0.5, 1.0, 0.8), intensity: 2.0, radius: 900.0)
-        ]
-
-        let spotLights: [MtlSpotLight] = [
-            MtlSpotLight(position: simd_float3(-0.0, 300.0, 0.0), direction: simd_normalize(simd_float3(1.0, 0.0, 0.0)), color: simd_float3(1.0, 0.0, 0.0), intensity: 28.0, innerCos: cos(12.0 * .pi / 180.0), outerCos: cos(22.0 * .pi / 180.0), radius: 1800.0)
-        ]
-
-        return (directional, pointLights, spotLights)
-    }
+    func makeDrawCalls(cameraPosition: simd_float3) -> [GeometryDrawCall]
 }
 
 final class USDSceneImporter {
@@ -56,7 +47,7 @@ final class USDSceneImporter {
 
         let asset = MDLAsset(url: sceneURL, vertexDescriptor: mdlVertexDescriptor, bufferAllocator: allocator)
 
-        let textureLoadingOptions: [MTKTextureLoader.Option: Any] = [.SRGB: false]
+        let textureLoadingOptions: [MTKTextureLoader.Option: Any] = [.SRGB: true]
         var drawCalls: [GeometryDrawCall] = []
         asset.loadTextures()
 
@@ -75,7 +66,7 @@ final class USDSceneImporter {
                 let albedo = mdlSubmesh.flatMap { loadBaseColorTexture(from: $0.material, textureLoadingOptions: textureLoadingOptions) }
 
                 drawCalls.append(
-                    GeometryDrawCall(
+                    .indexed(IndexedGeometryDrawCall(
                         vertexBuffer: mtkMesh.vertexBuffers[0].buffer,
                         vertexBufferOffset: mtkMesh.vertexBuffers[0].offset,
                         indexBuffer: mtkSubmesh.indexBuffer.buffer,
@@ -84,9 +75,13 @@ final class USDSceneImporter {
                         indexType: mtkSubmesh.indexType,
                         primitiveType: mtkSubmesh.primitiveType,
                         modelMatrix: matrix_identity_float4x4,
-                        albedoTexture: albedo,
-                        specularStrength: Self.sponzaSpecularStrength
-                    )
+                        material: MaterialDrawState(
+                            albedoTexture: albedo,
+                            normalTexture: nil,
+                            displacementTexture: nil,
+                            specularStrength: Self.sponzaSpecularStrength
+                        )
+                    ))
                 )
             }
         }

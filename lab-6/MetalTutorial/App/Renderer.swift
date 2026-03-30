@@ -1,5 +1,6 @@
 import Metal
 import MetalKit
+import QuartzCore
 import simd
 
 // Top-level frame orchestrator:
@@ -10,17 +11,24 @@ final class Renderer: NSObject, MTKViewDelegate {
     private let commandQueue: MTLCommandQueue
     private let renderingSystem: RenderingSystem
 
-    private var drawCalls: [GeometryDrawCall] = []
+    private var scene: (any RenderScene)!
+    var onFPSUpdate: ((Double) -> Void)?
+    var onDebugModeUpdate: ((String) -> Void)?
 
     // Camera state used to build view/projection matrices every frame.
     private var viewPosition = simd_float3(0.0, 4.0, 15.0)
     private var aspectRatio: Float = 1.0
     private var cameraController: CameraFlyController?
+    private var lastFPSUpdateTime = CACurrentMediaTime()
+    private var accumulatedFrameTime: Double = 0.0
+    private var accumulatedFrameCount: Int = 0
 
     // Scene light sets consumed during deferred lighting.
+    private var ambientLight: MtlAmbientLight
     private var dirLight: MtlDirectionalLight
     private var pointLights: [MtlPointLight]
     private var spotLights: [MtlSpotLight]
+    private let impulseLightSystem = ImpulsePointLightSystem()
 
     init?(metalKitView: MTKView) {
         // Bootstrap Metal device/queue and configure drawable formats.
@@ -28,16 +36,16 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard let queue = device.makeCommandQueue() else { return nil }
         self.commandQueue = queue
 
-        metalKitView.colorPixelFormat = .bgra8Unorm
+        metalKitView.colorPixelFormat = .bgra8Unorm_srgb
         metalKitView.depthStencilPixelFormat = .depth32Float
         metalKitView.sampleCount = 1
 
         self.renderingSystem = RenderingSystem(device: device, view: metalKitView)
 
-        let (presetDirectional, presetPoints, presetSpots) = SceneLightRig.sponza()
-        self.dirLight = presetDirectional
-        self.pointLights = presetPoints
-        self.spotLights = presetSpots
+        self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.03)
+        self.dirLight = MtlDirectionalLight(direction: simd_float3(0, -1, 0), color: simd_float3(1, 1, 1), intensity: 0.0)
+        self.pointLights = []
+        self.spotLights = []
 
         super.init()
 
@@ -58,9 +66,12 @@ final class Renderer: NSObject, MTKViewDelegate {
               let renderPassDescriptor = view.currentRenderPassDescriptor,
               let drawable = view.currentDrawable else { return }
 
+        updateFPS()
+
         // Update camera movement and derive matrices.
         let deltaTime = max(Float(view.preferredFramesPerSecond > 0 ? 1.0 / Double(view.preferredFramesPerSecond) : 1.0 / 60.0), 1.0 / 240.0)
         cameraController?.update(deltaTime: deltaTime)
+        impulseLightSystem.update(deltaTime: deltaTime)
 
         let projection = createPerspectiveMatrix(
             fov: toRadians(from: 50.0),
@@ -84,7 +95,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         // Deferred step A: write material + normal + depth into the G-Buffer.
         renderingSystem.encodeGeometryPass(
             commandBuffer: commandBuffer,
-            drawCalls: drawCalls,
+            drawCalls: scene.makeDrawCalls(cameraPosition: viewPosition),
+            rendererKind: scene.geometryRendererKind,
+            cameraPosition: viewPosition,
             viewMatrix: viewMat,
             projectionMatrix: projection
         )
@@ -97,8 +110,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             commandBuffer: commandBuffer,
             renderPassDescriptor: renderPassDescriptor,
             viewPosition: viewPosition,
+            ambient: ambientLight,
             directional: dirLight,
-            points: pointLights,
+            points: pointLights + impulseLightSystem.makePointLights(),
             spots: spotLights,
             inverseView: viewMat.inverse,
             inverseProjection: projection.inverse
@@ -111,6 +125,19 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     func setCameraController(_ cameraController: CameraFlyController) {
         self.cameraController = cameraController
+        cameraController.setPose(
+            position: scene.preferredCameraPosition,
+            yaw: scene.preferredCameraYaw,
+            pitch: scene.preferredCameraPitch
+        )
+        viewPosition = scene.preferredCameraPosition
+    }
+
+    func spawnImpulseLightFromCamera() {
+        guard let cameraController else { return }
+        let spawnOffset: Float = 1.0
+        let spawnPosition = cameraController.position + cameraController.forwardVector * spawnOffset
+        impulseLightSystem.spawn(at: spawnPosition, forward: cameraController.forwardVector)
     }
 
     func setDebugPreviewMode(index: Int) {
@@ -120,73 +147,39 @@ final class Renderer: NSObject, MTKViewDelegate {
         case 3: mode = .normal
         case 4: mode = .depth
         case 5: mode = .worldPosition
+        case 6: mode = .wireframe
         default: mode = .lit
         }
         renderingSystem.setDebugPreviewMode(mode)
+        onDebugModeUpdate?(debugModeTitle(for: mode))
     }
 
     private func loadScene(device: MTLDevice) {
-        // Preferred path: load Sponza so deferred lighting stages are easy to inspect.
-        let importer = USDSceneImporter(device: device)
-        if let geometry = importer.loadSponzaScene(vertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()) {
-            drawCalls = geometry.drawCalls
-            print("[Renderer] Loaded Sponza scene with \(drawCalls.count) draw calls")
-            return
-        }
-
-        // Fallback path: still exercises the exact same deferred pipeline.
-        print("[Renderer] Falling back to built-in cube scene")
-        drawCalls = [makeFallbackCubeDrawCall(device: device)]
-
-        dirLight = MtlDirectionalLight(direction: simd_normalize(simd_float3(-0.45, -1.0, -0.2)), color: simd_float3(1.0, 1.0, 1.0), intensity: 1.0)
-        pointLights = [
-            MtlPointLight(position: simd_float3(2.0, 2.0, 2.0), color: simd_float3(1.0, 0.6, 0.3), intensity: 6.0, radius: 6.0),
-            MtlPointLight(position: simd_float3(-2.0, 1.5, -1.0), color: simd_float3(0.3, 0.6, 1.0), intensity: 4.0, radius: 5.0)
-        ]
-        spotLights = [
-            MtlSpotLight(position: simd_float3(0.0, 3.0, 0.0), direction: simd_normalize(simd_float3(0.0, -1.0, 0.0)), color: simd_float3(1.0, 1.0, 0.9), intensity: 8.0, innerCos: cos(10.0 * .pi / 180.0), outerCos: cos(20.0 * .pi / 180.0), radius: 8.0)
-        ]
+        applyScene(TessellationScene(
+            device: device,
+            //geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
+        ))
     }
 
-    private func makeFallbackCubeDrawCall(device: MTLDevice) -> GeometryDrawCall {
-        // Build one indexed mesh + optional albedo texture.
-        let vertexBuffer = device.makeBuffer(
-            bytes: cubeVertices,
-            length: cubeVertices.count * MemoryLayout<Vertex>.stride,
-            options: .storageModeShared
-        )!
-
-        let indexBuffer = device.makeBuffer(
-            bytes: cubeIndices,
-            length: cubeIndices.count * MemoryLayout<UInt16>.stride,
-            options: .storageModeShared
-        )!
-
-        let loader = MTKTextureLoader(device: device)
-        let albedoTexture: MTLTexture?
-        if let url = Bundle.main.url(forResource: "planks", withExtension: "png") {
-            albedoTexture = try? loader.newTexture(URL: url, options: [MTKTextureLoader.Option.SRGB: false])
-        } else {
-            albedoTexture = nil
-        }
-
-        return GeometryDrawCall(
-            vertexBuffer: vertexBuffer,
-            vertexBufferOffset: 0,
-            indexBuffer: indexBuffer,
-            indexBufferOffset: 0,
-            indexCount: cubeIndices.count,
-            indexType: .uint16,
-            primitiveType: .triangle,
-            modelMatrix: matrix_identity_float4x4,
-            albedoTexture: albedoTexture,
-            specularStrength: 0.45
+    private func applyScene(_ nextScene: any RenderScene) {
+        scene = nextScene
+        ambientLight = scene.ambientLight
+        dirLight = scene.directionalLight
+        pointLights = scene.pointLights
+        spotLights = scene.spotLights
+        renderingSystem.setDebugPreviewMode(.lit)
+        onDebugModeUpdate?(debugModeTitle(for: .lit))
+        viewPosition = scene.preferredCameraPosition
+        cameraController?.setPose(
+            position: scene.preferredCameraPosition,
+            yaw: scene.preferredCameraYaw,
+            pitch: scene.preferredCameraPitch
         )
     }
 
     private func animateCamera() {
-        // Orbit camera only for the tiny fallback scene (single draw call).
-        guard drawCalls.count <= 1 else {
+        // Orbit camera only for simple scenes like the cube fallback.
+        guard scene.prefersOrbitingCamera else {
             viewPosition = simd_float3(0.0, 4.0, 15.0)
             return
         }
@@ -195,5 +188,40 @@ final class Renderer: NSObject, MTKViewDelegate {
         viewPosition.x = 5.0 * sin(t)
         viewPosition.z = 5.0 * cos(t)
         viewPosition.y = 3.5
+    }
+
+    private func updateFPS() {
+        let now = CACurrentMediaTime()
+        let frameTime = now - lastFPSUpdateTime
+        lastFPSUpdateTime = now
+
+        guard frameTime > 0 else { return }
+
+        accumulatedFrameTime += frameTime
+        accumulatedFrameCount += 1
+
+        guard accumulatedFrameTime >= 0.25 else { return }
+
+        let fps = Double(accumulatedFrameCount) / accumulatedFrameTime
+        accumulatedFrameTime = 0.0
+        accumulatedFrameCount = 0
+        onFPSUpdate?(fps)
+    }
+
+    private func debugModeTitle(for mode: RenderingSystem.DebugPreviewMode) -> String {
+        switch mode {
+        case .lit:
+            return "Lit"
+        case .albedo:
+            return "Albedo"
+        case .normal:
+            return "Normal"
+        case .depth:
+            return "Depth"
+        case .worldPosition:
+            return "World Position"
+        case .wireframe:
+            return "Wireframe"
+        }
     }
 }

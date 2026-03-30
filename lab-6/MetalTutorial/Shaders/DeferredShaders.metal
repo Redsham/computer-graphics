@@ -10,6 +10,7 @@ struct VertexIn {
 
 struct VSOutGeo {
     float4 position [[position]];
+    float3 worldPosition;
     float3 worldNormal;
     float2 uv;
 };
@@ -31,11 +32,18 @@ static inline float3x3 normalMatrix(float4x4 model) {
 vertex VSOutGeo vertexGeometry(VertexIn in [[stage_in]],
                                constant float4x4 &model [[buffer(1)]],
                                constant float4x4 &view [[buffer(2)]],
-                               constant float4x4 &proj [[buffer(3)]]) {
+                               constant float4x4 &proj [[buffer(3)]],
+                               constant float3 &cameraPos [[buffer(4)]],
+                               constant float2 &surfaceParams [[buffer(5)]],
+                               texture2d<float> displacementTex [[texture(0)]]) {
     // Deferred geometry stage: output clip-space position + world-space attributes.
     VSOutGeo out;
+    (void)cameraPos;
+    (void)surfaceParams;
+    (void)displacementTex;
     float4 worldPosition = model * float4(in.position, 1.0);
     out.position = proj * view * worldPosition;
+    out.worldPosition = worldPosition.xyz;
     out.worldNormal = normalize(normalMatrix(model) * in.normal);
     out.uv = in.texCoord;
     return out;
@@ -48,7 +56,8 @@ struct GBufferOut {
 
 fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
                                      constant float &specularStrength [[buffer(0)]],
-                                     texture2d<float> albedoTex [[texture(0)]]) {
+                                     texture2d<float> albedoTex [[texture(0)]],
+                                     texture2d<float> normalTex [[texture(1)]]) {
     // Write material properties into MRT G-Buffer attachments.
     constexpr sampler linearRepeat(address::repeat, filter::linear);
     GBufferOut out;
@@ -57,7 +66,19 @@ fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
     } else {
         out.albedo = float4(albedoTex.sample(linearRepeat, in.uv).rgb, saturate(specularStrength));
     }
-    out.normal = float4(normalize(in.worldNormal), 1.0);
+    float3 N = normalize(in.worldNormal);
+    if (normalTex.get_width() > 0 && normalTex.get_height() > 0) {
+        float3 dPdx = dfdx(in.worldPosition);
+        float3 dPdy = dfdy(in.worldPosition);
+        float2 dUVdx = dfdx(in.uv);
+        float2 dUVdy = dfdy(in.uv);
+        float3 T = normalize(dPdx * dUVdy.y - dPdy * dUVdx.y);
+        float3 B = normalize(-dPdx * dUVdy.x + dPdy * dUVdx.x);
+        float3x3 tbn = float3x3(T, B, N);
+        float3 normalTS = normalize(normalTex.sample(linearRepeat, in.uv).xyz * 2.0 - 1.0);
+        N = normalize(tbn * normalTS);
+    }
+    out.normal = float4(N, 1.0);
     return out;
 }
 
@@ -76,12 +97,17 @@ vertex VSOutFullscreen vertexFullscreen(uint vertexID [[vertex_id]]) {
 
     VSOutFullscreen out;
     out.position = float4(positions[vertexID], 0.0, 1.0);
-    out.uv = 0.5 * (positions[vertexID] + 1.0);
+    out.uv = float2(positions[vertexID].x * 0.5 + 0.5,
+                    0.5 - positions[vertexID].y * 0.5);
     return out;
 }
 
 struct MtlDirectionalLight {
     float4 direction;
+    float4 colorIntensity;
+};
+
+struct MtlAmbientLight {
     float4 colorIntensity;
 };
 
@@ -157,14 +183,15 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
                                  texture2d<float> gNormal [[texture(1)]],
                                  depth2d<float> gDepth [[texture(2)]],
                                  constant float3 &eyePos [[buffer(0)]],
-                                 constant MtlDirectionalLight &dLight [[buffer(1)]],
-                                 constant uint &pointCount [[buffer(2)]],
-                                 const device MtlPointLight *pointLights [[buffer(3)]],
-                                 constant uint &spotCount [[buffer(4)]],
-                                 const device MtlSpotLight *spotLights [[buffer(5)]],
-                                 constant float4x4 &invView [[buffer(6)]],
-                                 constant float4x4 &invProj [[buffer(7)]],
-                                 constant int &previewMode [[buffer(8)]]) {
+                                 constant MtlAmbientLight &ambientLight [[buffer(1)]],
+                                 constant MtlDirectionalLight &dLight [[buffer(2)]],
+                                 constant uint &pointCount [[buffer(3)]],
+                                 const device MtlPointLight *pointLights [[buffer(4)]],
+                                 constant uint &spotCount [[buffer(5)]],
+                                 const device MtlSpotLight *spotLights [[buffer(6)]],
+                                 constant float4x4 &invView [[buffer(7)]],
+                                 constant float4x4 &invProj [[buffer(8)]],
+                                 constant int &previewMode [[buffer(9)]]) {
     // Deferred lighting stage:
     // 1) read packed G-Buffer,
     // 2) reconstruct world position from depth,
@@ -180,7 +207,7 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
 
     float depth = gDepth.sample(nearestClamp, uv);
     if (depth >= 1.0) {
-        return float4(0.03 * albedo, 1.0);
+        return float4(albedo * ambientLight.colorIntensity.xyz * ambientLight.colorIntensity.w, 1.0);
     }
 
     float2 ndcXY = float2(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
@@ -200,14 +227,34 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
         return float4(N * 0.5 + 0.5, 1.0);
     }
     if (previewMode == 3) {
-        return float4(depth, depth, depth, 1.0);
+        float2 ndcXY = float2(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0);
+        float4 clipPos = float4(ndcXY, depth, 1.0);
+        float4 viewPos = invProj * clipPos;
+        viewPos /= max(viewPos.w, 1e-6);
+
+        float linearDepth = abs(viewPos.z);
+        float debugDepth = saturate(linearDepth / 5000.0);
+        return float4(debugDepth, debugDepth, debugDepth, 1.0);
     }
     if (previewMode == 4) {
         return float4(fract(abs(P) * 0.05), 1.0);
     }
+    if (previewMode == 5) {
+        float lineMask = max(max(albedo.r, albedo.g), albedo.b);
+        float3 wireColor = mix(float3(0.05, 0.06, 0.08), float3(0.92, 0.96, 1.0), saturate(lineMask));
+        return float4(wireColor, 1.0);
+    }
+
+    bool hasAmbient = ambientLight.colorIntensity.w > 1e-5;
+    bool hasDirectional = dLight.colorIntensity.w > 1e-5;
+    bool hasPointLights = pointCount > 0;
+    bool hasSpotLights = spotCount > 0;
+    if (!hasAmbient && !hasDirectional && !hasPointLights && !hasSpotLights) {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
 
     // Base ambient + dynamic light accumulation.
-    float3 color = 0.03 * albedo;
+    float3 color = albedo * ambientLight.colorIntensity.xyz * ambientLight.colorIntensity.w;
     color += applyDirectional(N, V, albedo, specularStrength, dLight);
 
     for (uint i = 0; i < pointCount; ++i) {

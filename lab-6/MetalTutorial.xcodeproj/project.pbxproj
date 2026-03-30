@@ -7,35 +7,49 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B64421F92F7AC55400FD4297 /* cliff_side_diff_2k.jpg in Resources */ = {isa = PBXBuildFile; fileRef = B64421F72F7AC55400FD4297 /* cliff_side_diff_2k.jpg */; };
+		B64421FA2F7AC55400FD4297 /* cliff_side_disp_2k.png in Resources */ = {isa = PBXBuildFile; fileRef = B64421F82F7AC55400FD4297 /* cliff_side_disp_2k.png */; };
+		B64421FD2F7AC5AC00FD4297 /* cliff_side_nor_2k.jpg in Resources */ = {isa = PBXBuildFile; fileRef = B64421FC2F7AC5AC00FD4297 /* cliff_side_nor_2k.jpg */; };
 		B65EA1402F773A0A00ECBCC0 /* Sponza_Scene.usdz in Resources */ = {isa = PBXBuildFile; fileRef = B65EA13F2F773A0A00ECBCC0 /* Sponza_Scene.usdz */; };
 		B65EA1482F7742DF00ECBCC0 /* CameraFlyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1462F7742DF00ECBCC0 /* CameraFlyController.swift */; };
 		B65EA1492F7742DF00ECBCC0 /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1472F7742DF00ECBCC0 /* Renderer.swift */; };
-		B65EA14D2F7743E100ECBCC0 /* CubeGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA14B2F7743E100ECBCC0 /* CubeGeometry.swift */; };
 		B65EA14E2F7743E100ECBCC0 /* USDSceneImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA14C2F7743E100ECBCC0 /* USDSceneImporter.swift */; };
 		B65EA1532F77443E00ECBCC0 /* RenderingSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1522F77443E00ECBCC0 /* RenderingSystem.swift */; };
 		B65EA1542F77443E00ECBCC0 /* GBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1512F77443E00ECBCC0 /* GBuffer.swift */; };
 		B65EA1572F77447700ECBCC0 /* DeferredShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1562F77447700ECBCC0 /* DeferredShaders.metal */; };
+		B65EA1622F77555500ECBCC1 /* TessellationShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1622F77555500ECBCC2 /* TessellationShaders.metal */; };
+		B65EA1612F77555500ECBCC0 /* ImpulsePointLightSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B65EA1602F77555500ECBCC0 /* ImpulsePointLightSystem.swift */; };
+		C152A0013030000000A10001 /* TextureSetLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C152A0013030000000A10002 /* TextureSetLoader.swift */; };
 		D8B4B2D82AF573A40053AAE4 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B4B2D72AF573A40053AAE4 /* AppDelegate.swift */; };
 		D8B4B2DA2AF573A40053AAE4 /* GameViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B4B2D92AF573A40053AAE4 /* GameViewController.swift */; };
 		D8B4B2E12AF573A50053AAE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D8B4B2E02AF573A50053AAE4 /* Assets.xcassets */; };
 		D8B4B2E42AF573A50053AAE4 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D8B4B2E22AF573A50053AAE4 /* Main.storyboard */; };
+		E10000013030000000A10001 /* DeferredScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10002 /* DeferredScene.swift */; };
+		E10000013030000000A10003 /* TessellationScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10004 /* TessellationScene.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B64421F72F7AC55400FD4297 /* cliff_side_diff_2k.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = cliff_side_diff_2k.jpg; sourceTree = "<group>"; };
+		B64421F82F7AC55400FD4297 /* cliff_side_disp_2k.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = cliff_side_disp_2k.png; sourceTree = "<group>"; };
+		B64421FC2F7AC5AC00FD4297 /* cliff_side_nor_2k.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = cliff_side_nor_2k.jpg; sourceTree = "<group>"; };
 		B65EA13F2F773A0A00ECBCC0 /* Sponza_Scene.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sponza_Scene.usdz; sourceTree = "<group>"; };
 		B65EA1462F7742DF00ECBCC0 /* CameraFlyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFlyController.swift; sourceTree = "<group>"; };
 		B65EA1472F7742DF00ECBCC0 /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
-		B65EA14B2F7743E100ECBCC0 /* CubeGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CubeGeometry.swift; sourceTree = "<group>"; };
 		B65EA14C2F7743E100ECBCC0 /* USDSceneImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USDSceneImporter.swift; sourceTree = "<group>"; };
 		B65EA1512F77443E00ECBCC0 /* GBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GBuffer.swift; sourceTree = "<group>"; };
 		B65EA1522F77443E00ECBCC0 /* RenderingSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderingSystem.swift; sourceTree = "<group>"; };
 		B65EA1562F77447700ECBCC0 /* DeferredShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = DeferredShaders.metal; sourceTree = "<group>"; };
+		B65EA1622F77555500ECBCC2 /* TessellationShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TessellationShaders.metal; sourceTree = "<group>"; };
+		B65EA1602F77555500ECBCC0 /* ImpulsePointLightSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImpulsePointLightSystem.swift; sourceTree = "<group>"; };
+		C152A0013030000000A10002 /* TextureSetLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureSetLoader.swift; sourceTree = "<group>"; };
 		D8B4B2D42AF573A40053AAE4 /* MetalCube.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MetalCube.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D8B4B2D72AF573A40053AAE4 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D8B4B2D92AF573A40053AAE4 /* GameViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewController.swift; sourceTree = "<group>"; };
 		D8B4B2E02AF573A50053AAE4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D8B4B2E32AF573A50053AAE4 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		D8B4B2E52AF573A50053AAE4 /* MetalTutorial.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MetalTutorial.entitlements; sourceTree = "<group>"; };
+		E10000013030000000A10002 /* DeferredScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeferredScene.swift; sourceTree = "<group>"; };
+		E10000013030000000A10004 /* TessellationScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TessellationScene.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -53,10 +67,30 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		B65EA14A2F7742E800ECBCC0 /* App */ = {
+		B64421FB2F7AC55A00FD4297 /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				B64421FC2F7AC5AC00FD4297 /* cliff_side_nor_2k.jpg */,
+				B64421F72F7AC55400FD4297 /* cliff_side_diff_2k.jpg */,
+				B64421F82F7AC55400FD4297 /* cliff_side_disp_2k.png */,
+				B65EA13F2F773A0A00ECBCC0 /* Sponza_Scene.usdz */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
+		B64421FE2F7AC69C00FD4297 /* Components */ = {
 			isa = PBXGroup;
 			children = (
 				B65EA1462F7742DF00ECBCC0 /* CameraFlyController.swift */,
+				B65EA1602F77555500ECBCC0 /* ImpulsePointLightSystem.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		B65EA14A2F7742E800ECBCC0 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				B64421FE2F7AC69C00FD4297 /* Components */,
 				B65EA1472F7742DF00ECBCC0 /* Renderer.swift */,
 				D8B4B2D72AF573A40053AAE4 /* AppDelegate.swift */,
 				D8B4B2D92AF573A40053AAE4 /* GameViewController.swift */,
@@ -67,7 +101,8 @@
 		B65EA14F2F7743E500ECBCC0 /* Scene */ = {
 			isa = PBXGroup;
 			children = (
-				B65EA14B2F7743E100ECBCC0 /* CubeGeometry.swift */,
+				E10000013030000000A10002 /* DeferredScene.swift */,
+				E10000013030000000A10004 /* TessellationScene.swift */,
 				B65EA14C2F7743E100ECBCC0 /* USDSceneImporter.swift */,
 			);
 			path = Scene;
@@ -78,6 +113,7 @@
 			children = (
 				B65EA1512F77443E00ECBCC0 /* GBuffer.swift */,
 				B65EA1522F77443E00ECBCC0 /* RenderingSystem.swift */,
+				C152A0013030000000A10002 /* TextureSetLoader.swift */,
 			);
 			path = Rendering;
 			sourceTree = "<group>";
@@ -86,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				B65EA1562F77447700ECBCC0 /* DeferredShaders.metal */,
+				B65EA1622F77555500ECBCC2 /* TessellationShaders.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
@@ -109,13 +146,13 @@
 		D8B4B2D62AF573A40053AAE4 /* MetalTutorial */ = {
 			isa = PBXGroup;
 			children = (
+				B64421FB2F7AC55A00FD4297 /* Assets */,
 				B65EA1452F77429F00ECBCC0 /* Core */,
 				B65EA14A2F7742E800ECBCC0 /* App */,
 				B65EA1582F77447C00ECBCC0 /* Shaders */,
 				B65EA1552F77444600ECBCC0 /* Rendering */,
 				B65EA14F2F7743E500ECBCC0 /* Scene */,
 				D8B4B2E02AF573A50053AAE4 /* Assets.xcassets */,
-				B65EA13F2F773A0A00ECBCC0 /* Sponza_Scene.usdz */,
 				D8B4B2E22AF573A50053AAE4 /* Main.storyboard */,
 				D8B4B2E52AF573A50053AAE4 /* MetalTutorial.entitlements */,
 			);
@@ -184,8 +221,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				B65EA1402F773A0A00ECBCC0 /* Sponza_Scene.usdz in Resources */,
+				B64421F92F7AC55400FD4297 /* cliff_side_diff_2k.jpg in Resources */,
+				B64421FA2F7AC55400FD4297 /* cliff_side_disp_2k.png in Resources */,
 				D8B4B2E12AF573A50053AAE4 /* Assets.xcassets in Resources */,
 				D8B4B2E42AF573A50053AAE4 /* Main.storyboard in Resources */,
+				B64421FD2F7AC5AC00FD4297 /* cliff_side_nor_2k.jpg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -198,12 +238,16 @@
 			files = (
 				D8B4B2DA2AF573A40053AAE4 /* GameViewController.swift in Sources */,
 				B65EA1572F77447700ECBCC0 /* DeferredShaders.metal in Sources */,
+				B65EA1622F77555500ECBCC1 /* TessellationShaders.metal in Sources */,
 				B65EA1482F7742DF00ECBCC0 /* CameraFlyController.swift in Sources */,
 				B65EA1492F7742DF00ECBCC0 /* Renderer.swift in Sources */,
 				B65EA1532F77443E00ECBCC0 /* RenderingSystem.swift in Sources */,
+				B65EA1612F77555500ECBCC0 /* ImpulsePointLightSystem.swift in Sources */,
 				B65EA1542F77443E00ECBCC0 /* GBuffer.swift in Sources */,
+				C152A0013030000000A10001 /* TextureSetLoader.swift in Sources */,
 				D8B4B2D82AF573A40053AAE4 /* AppDelegate.swift in Sources */,
-				B65EA14D2F7743E100ECBCC0 /* CubeGeometry.swift in Sources */,
+				E10000013030000000A10001 /* DeferredScene.swift in Sources */,
+				E10000013030000000A10003 /* TessellationScene.swift in Sources */,
 				B65EA14E2F7743E100ECBCC0 /* USDSceneImporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -351,7 +395,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = MetalTutorial/MetalTutorial.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -369,7 +413,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = a.MetalCube;
+				PRODUCT_BUNDLE_IDENTIFIER = a.MetalTutorial;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "";
@@ -382,7 +426,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = MetalTutorial/MetalTutorial.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -400,7 +444,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = a.MetalCube;
+				PRODUCT_BUNDLE_IDENTIFIER = a.MetalTutorial;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "";

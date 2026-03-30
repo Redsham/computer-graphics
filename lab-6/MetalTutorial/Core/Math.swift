@@ -57,7 +57,7 @@ func scaleMatrix(matrix: inout simd_float4x4, scale: simd_float3) {
 func createViewMatrix(eyePosition: simd_float3, targetPosition: simd_float3, upVec: simd_float3) -> simd_float4x4 {
     let forward = normalize(targetPosition - eyePosition)
     let rightVec = normalize(simd_cross(forward, upVec))
-    let up = simd_cross(forward, rightVec)
+    let up = simd_cross(rightVec, forward)
     
     var matrix = matrix_identity_float4x4;
     matrix[0][0] = rightVec.x;
