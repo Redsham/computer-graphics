@@ -18,6 +18,8 @@ struct TerrainPatchGeometry {
     let patchInfoBuffer: MTLBuffer
     let tessellationFactorBuffer: MTLBuffer
     let patchCount: Int
+    let boundsMin: simd_float2
+    let boundsMax: simd_float2
 }
 
 enum GeometryPrimitives {
@@ -55,14 +57,16 @@ enum GeometryPrimitives {
                 albedoTexture: albedoTexture,
                 normalTexture: nil,
                 displacementTexture: nil,
-                specularStrength: 0.45
+                specularStrength: 0.45,
+                roughness: 0.35,
+                opacity: 1.0
             )
         ))
     }
 
     static func makeTerrainPatch(device: MTLDevice,
-                                 size: Float = 420.0,
-                                 centerZ: Float = -220.0,
+                                 size: simd_float2 = simd_float2(repeating: 420.0),
+                                 center: simd_float2 = simd_float2(0.0, -220.0),
                                  patchResolution: Int = 8,
                                  minFactor: Float = 2.0,
                                  maxFactor: Float = 24.0,
@@ -79,10 +83,10 @@ enum GeometryPrimitives {
 
         for z in 0 ..< resolution {
             for x in 0 ..< resolution {
-                let x0 = -halfSize + Float(x) * patchSize
-                let x1 = x0 + patchSize
-                let z0 = centerZ - halfSize + Float(z) * patchSize
-                let z1 = z0 + patchSize
+                let x0 = center.x - halfSize.x + Float(x) * patchSize.x
+                let x1 = x0 + patchSize.x
+                let z0 = center.y - halfSize.y + Float(z) * patchSize.y
+                let z1 = z0 + patchSize.y
 
                 let u0 = Float(x) / Float(resolution)
                 let u1 = Float(x + 1) / Float(resolution)
@@ -96,15 +100,8 @@ enum GeometryPrimitives {
 
                 patchInfos.append(
                     TessellationPatchInfo(
-                        patchCenter: simd_float3((x0 + x1) * 0.5, 0.0, (z0 + z1) * 0.5),
-                        minFactor: minFactor,
-                        maxFactor: maxFactor,
-                        minDistance: minDistance,
-                        maxDistance: maxDistance,
-                        edgeMidpoint0: simd_float3((x0 + x1) * 0.5, 0.0, z0),
-                        edgeMidpoint1: simd_float3(x1, 0.0, (z0 + z1) * 0.5),
-                        edgeMidpoint2: simd_float3((x0 + x1) * 0.5, 0.0, z1),
-                        edgeMidpoint3: simd_float3(x0, 0.0, (z0 + z1) * 0.5)
+                        patchMin: simd_float2(x0, z0),
+                        patchMax: simd_float2(x1, z1)
                     )
                 )
             }
@@ -121,7 +118,9 @@ enum GeometryPrimitives {
                 length: MemoryLayout<TessellationPatchInfo>.stride * patchInfos.count
             )!,
             tessellationFactorBuffer: device.makeBuffer(length: factorBufferLength)!,
-            patchCount: patchInfos.count
+            patchCount: patchInfos.count,
+            boundsMin: simd_float2(center.x - halfSize.x, center.y - halfSize.y),
+            boundsMax: simd_float2(center.x + halfSize.x, center.y + halfSize.y)
         )
     }
 

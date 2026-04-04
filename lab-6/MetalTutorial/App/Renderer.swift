@@ -70,6 +70,7 @@ final class Renderer: NSObject, MTKViewDelegate {
 
         // Update camera movement and derive matrices.
         let deltaTime = max(Float(view.preferredFramesPerSecond > 0 ? 1.0 / Double(view.preferredFramesPerSecond) : 1.0 / 60.0), 1.0 / 240.0)
+        let time = Float(CACurrentMediaTime())
         cameraController?.update(deltaTime: deltaTime)
         impulseLightSystem.update(deltaTime: deltaTime)
 
@@ -98,6 +99,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             drawCalls: scene.makeDrawCalls(cameraPosition: viewPosition),
             rendererKind: scene.geometryRendererKind,
             cameraPosition: viewPosition,
+            time: time,
             viewMatrix: viewMat,
             projectionMatrix: projection
         )
@@ -116,6 +118,21 @@ final class Renderer: NSObject, MTKViewDelegate {
             spots: spotLights,
             inverseView: viewMat.inverse,
             inverseProjection: projection.inverse
+        )
+
+        renderingSystem.encodeTransparentPass(
+            commandBuffer: commandBuffer,
+            drawableTexture: drawable.texture,
+            drawCalls: scene.makeDrawCalls(cameraPosition: viewPosition),
+            viewPosition: viewPosition,
+            ambient: ambientLight,
+            directional: dirLight,
+            points: pointLights + impulseLightSystem.makePointLights(),
+            spots: spotLights,
+            debugPreviewMode: renderingSystem.debugPreviewModeValue,
+            time: time,
+            viewMatrix: viewMat,
+            projectionMatrix: projection
         )
 
         // Submit and present frame.
@@ -155,9 +172,9 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     private func loadScene(device: MTLDevice) {
-        applyScene(TessellationScene(
+        applyScene(DeferredScene(
             device: device,
-            //geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
+            geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
         ))
     }
 

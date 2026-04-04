@@ -3,16 +3,21 @@ import simd
 
 final class TessellationScene: RenderScene {
     struct Settings {
-        var patchSize: Float = 420.0
-        var patchCenterZ: Float = -220.0
-        var patchResolution: Int = 16
+        var patchSize: simd_float2 = simd_float2(repeating: 420.0)
+        var patchCenter: simd_float2 = simd_float2(0.0, -220.0)
+        var patchResolution: Int = 8
         var minTessellationFactor: Float = 1.0
         var maxTessellationFactor: Float = 32.0
         var minDistance: Float = 200.0
         var maxDistance: Float = 1800.0
-        var displacementScale: Float = 16.0
-        var uvScale: simd_float2 = simd_float2(repeating: 1.0)
-        var normalStrength: Float = 1.0
+        var displacementScale: Float = 9.0
+        var uvScale: simd_float2 = simd_float2(repeating: 1.35)
+        var normalStrength: Float = 0.55
+        var waveAmplitude: Float = 2.6
+        var waveFrequency: Float = 13.0
+        var waveSpeed: Float = 1.3
+        var specularStrength: Float = 0.22
+        var roughness: Float = 0.88
     }
 
     let ambientLight: MtlAmbientLight
@@ -38,7 +43,7 @@ final class TessellationScene: RenderScene {
         let terrain = GeometryPrimitives.makeTerrainPatch(
             device: device,
             size: settings.patchSize,
-            centerZ: settings.patchCenterZ,
+            center: settings.patchCenter,
             patchResolution: settings.patchResolution,
             minFactor: settings.minTessellationFactor,
             maxFactor: settings.maxTessellationFactor,
@@ -50,15 +55,26 @@ final class TessellationScene: RenderScene {
             patchInfoBuffer: terrain.patchInfoBuffer,
             tessellationFactorBuffer: terrain.tessellationFactorBuffer,
             patchCount: terrain.patchCount,
+            tessellationBoundsMin: terrain.boundsMin,
+            tessellationBoundsMax: terrain.boundsMax,
+            minTessellationFactor: settings.minTessellationFactor,
+            maxTessellationFactor: settings.maxTessellationFactor,
+            minTessellationDistance: settings.minDistance,
+            maxTessellationDistance: settings.maxDistance,
             modelMatrix: matrix_identity_float4x4,
             displacementScale: settings.displacementScale,
-            uvScale: settings.uvScale,
+            uvScale: simd_max(settings.uvScale * (settings.patchSize / 420.0), simd_float2(repeating: 0.001)),
             normalStrength: settings.normalStrength,
+            waveAmplitude: settings.waveAmplitude,
+            waveFrequency: settings.waveFrequency,
+            waveSpeed: settings.waveSpeed,
             material: MaterialDrawState(
                 albedoTexture: textures.albedo,
                 normalTexture: textures.normal,
                 displacementTexture: textures.displacement,
-                specularStrength: 0.0
+                specularStrength: settings.specularStrength,
+                roughness: settings.roughness,
+                opacity: 0.38
             )
         ))
         self.ambientLight = MtlAmbientLight(color: simd_float3(1.0, 0.98, 0.95), intensity: 0.5)

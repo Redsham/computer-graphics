@@ -18,6 +18,7 @@ final class GBuffer {
 
     private(set) var albedo: MTLTexture!
     private(set) var normal: MTLTexture!
+    private(set) var material: MTLTexture!
     private(set) var depth: MTLTexture!
 
     init(device: MTLDevice, size: CGSize) {
@@ -33,19 +34,26 @@ final class GBuffer {
         width = w
         height = h
 
-        // MRT #0: albedo.rgb + specularStrength.a
+        // MRT #0: albedo.rgb.
         let albedoDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
         albedoDesc.usage = [.renderTarget, .shaderRead]
         albedoDesc.storageMode = .private
         albedo = device.makeTexture(descriptor: albedoDesc)
         albedo.label = "GBuffer Albedo"
 
-        // MRT #1: world normal.
+        // MRT #1: world normal + roughness.
         let normalDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: w, height: h, mipmapped: false)
         normalDesc.usage = [.renderTarget, .shaderRead]
         normalDesc.storageMode = .private
         normal = device.makeTexture(descriptor: normalDesc)
         normal.label = "GBuffer Normal"
+
+        // MRT #2: specular + opacity.
+        let materialDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: w, height: h, mipmapped: false)
+        materialDesc.usage = [.renderTarget, .shaderRead]
+        materialDesc.storageMode = .private
+        material = device.makeTexture(descriptor: materialDesc)
+        material.label = "GBuffer Material"
 
         // Shared depth used by geometry write and lighting reconstruction.
         let depthDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float, width: w, height: h, mipmapped: false)
@@ -69,6 +77,12 @@ final class GBuffer {
         c1.loadAction = .clear
         c1.storeAction = .store
         c1.clearColor = MTLClearColorMake(0, 0, 0, 0)
+
+        let c2 = rp.colorAttachments[2]!
+        c2.texture = material
+        c2.loadAction = .clear
+        c2.storeAction = .store
+        c2.clearColor = MTLClearColorMake(0, 0, 0, 1)
 
         rp.depthAttachment.texture = depth
         rp.depthAttachment.loadAction = .clear

@@ -8,7 +8,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "86AF6538-52D4-44F2-AE91-ACDB4AEA3572"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "MetalTutorial/Scene/DeferredScene.swift"
@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "44"
             endingLineNumber = "44"
-            landmarkName = "init(device:geometryVertexDescriptor:)"
+            landmarkName = "init(device:geometryVertexDescriptor:settings:)"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>

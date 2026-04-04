@@ -52,19 +52,27 @@ vertex VSOutGeo vertexGeometry(VertexIn in [[stage_in]],
 struct GBufferOut {
     float4 albedo [[color(0)]];
     float4 normal [[color(1)]];
+    float4 material [[color(2)]];
+};
+
+struct MaterialParams {
+    float specularStrength;
+    float roughness;
+    float opacity;
+    float _padding;
 };
 
 fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
-                                     constant float &specularStrength [[buffer(0)]],
+                                     constant MaterialParams &materialParams [[buffer(0)]],
                                      texture2d<float> albedoTex [[texture(0)]],
                                      texture2d<float> normalTex [[texture(1)]]) {
     // Write material properties into MRT G-Buffer attachments.
     constexpr sampler linearRepeat(address::repeat, filter::linear);
     GBufferOut out;
     if (albedoTex.get_width() == 0 || albedoTex.get_height() == 0) {
-        out.albedo = float4(1.0, 1.0, 1.0, saturate(specularStrength));
+        out.albedo = float4(1.0, 1.0, 1.0, 1.0);
     } else {
-        out.albedo = float4(albedoTex.sample(linearRepeat, in.uv).rgb, saturate(specularStrength));
+        out.albedo = float4(albedoTex.sample(linearRepeat, in.uv).rgb, 1.0);
     }
     float3 N = normalize(in.worldNormal);
     if (normalTex.get_width() > 0 && normalTex.get_height() > 0) {
@@ -78,7 +86,8 @@ fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
         float3 normalTS = normalize(normalTex.sample(linearRepeat, in.uv).xyz * 2.0 - 1.0);
         N = normalize(tbn * normalTS);
     }
-    out.normal = float4(N, 1.0);
+    out.normal = float4(N, saturate(materialParams.roughness));
+    out.material = float4(saturate(materialParams.specularStrength), saturate(materialParams.opacity), 0.0, 0.0);
     return out;
 }
 
@@ -123,7 +132,7 @@ struct MtlSpotLight {
     float4 params;
 };
 
-float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrength, constant MtlDirectionalLight &L) {
+float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrength, float roughness, constant MtlDirectionalLight &L) {
     // Classic Blinn-Phong directional contribution.
     float3 Ld = normalize(-L.direction.xyz);
     float NdotL = max(dot(N, Ld), 0.0);
@@ -132,11 +141,12 @@ float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrengt
 
     float3 diffuse = albedo * color * (intensity * NdotL);
     float3 H = normalize(Ld + V);
-    float specular = pow(max(dot(N, H), 0.0), 32.0) * intensity * specularStrength;
+    float shininess = mix(96.0, 6.0, saturate(roughness));
+    float specular = pow(max(dot(N, H), 0.0), shininess) * intensity * specularStrength;
     return diffuse + specular;
 }
 
-float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, device const MtlPointLight &L) {
+float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, float roughness, device const MtlPointLight &L) {
     // Point light with radius-based attenuation.
     float3 Ld = L.positionRadius.xyz - P;
     float dist = max(length(Ld), 1e-4);
@@ -151,11 +161,12 @@ float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStr
 
     float3 diffuse = albedo * color * (intensity * NdotL * att);
     float3 H = normalize(Ld + V);
-    float specular = pow(max(dot(N, H), 0.0), 32.0) * intensity * att * specularStrength;
+    float shininess = mix(96.0, 6.0, saturate(roughness));
+    float specular = pow(max(dot(N, H), 0.0), shininess) * intensity * att * specularStrength;
     return diffuse + specular;
 }
 
-float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, device const MtlSpotLight &L) {
+float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, float roughness, device const MtlSpotLight &L) {
     // Spot light with cone + distance attenuation.
     float3 Ld = L.positionRadius.xyz - P;
     float dist = max(length(Ld), 1e-4);
@@ -174,14 +185,16 @@ float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStre
     float NdotL = max(dot(N, Ld), 0.0);
     float3 diffuse = albedo * L.colorIntensity.xyz * (intensity * NdotL * att);
     float3 H = normalize(Ld + V);
-    float specular = pow(max(dot(N, H), 0.0), 32.0) * intensity * att * specularStrength;
+    float shininess = mix(96.0, 6.0, saturate(roughness));
+    float specular = pow(max(dot(N, H), 0.0), shininess) * intensity * att * specularStrength;
     return diffuse + specular;
 }
 
 fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
                                  texture2d<float> gAlbedo [[texture(0)]],
                                  texture2d<float> gNormal [[texture(1)]],
-                                 depth2d<float> gDepth [[texture(2)]],
+                                 texture2d<float> gMaterial [[texture(2)]],
+                                 depth2d<float> gDepth [[texture(3)]],
                                  constant float3 &eyePos [[buffer(0)]],
                                  constant MtlAmbientLight &ambientLight [[buffer(1)]],
                                  constant MtlDirectionalLight &dLight [[buffer(2)]],
@@ -202,8 +215,12 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
     float2 uv = clamp(in.uv, 0.0, 1.0);
     float4 gAlbedoSample = gAlbedo.sample(nearestClamp, uv);
     float3 albedo = gAlbedoSample.rgb;
-    float specularStrength = gAlbedoSample.a;
-    float3 N = normalize(gNormal.sample(nearestClamp, uv).xyz);
+    float4 gNormalSample = gNormal.sample(nearestClamp, uv);
+    float3 N = normalize(gNormalSample.xyz);
+    float roughness = saturate(gNormalSample.w);
+    float4 gMaterialSample = gMaterial.sample(nearestClamp, uv);
+    float specularStrength = saturate(gMaterialSample.x);
+    float opacity = saturate(gMaterialSample.y);
 
     float depth = gDepth.sample(nearestClamp, uv);
     if (depth >= 1.0) {
@@ -255,14 +272,15 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
 
     // Base ambient + dynamic light accumulation.
     float3 color = albedo * ambientLight.colorIntensity.xyz * ambientLight.colorIntensity.w;
-    color += applyDirectional(N, V, albedo, specularStrength, dLight);
+    color += applyDirectional(N, V, albedo, specularStrength, roughness, dLight);
 
     for (uint i = 0; i < pointCount; ++i) {
-        color += applyPoint(P, N, V, albedo, specularStrength, pointLights[i]);
+        color += applyPoint(P, N, V, albedo, specularStrength, roughness, pointLights[i]);
     }
     for (uint i = 0; i < spotCount; ++i) {
-        color += applySpot(P, N, V, albedo, specularStrength, spotLights[i]);
+        color += applySpot(P, N, V, albedo, specularStrength, roughness, spotLights[i]);
     }
 
-    return float4(color, 1.0);
+    float3 backgroundColor = float3(0.03, 0.04, 0.055);
+    return float4(mix(backgroundColor, color, opacity), 1.0);
 }

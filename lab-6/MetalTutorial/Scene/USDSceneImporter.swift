@@ -79,7 +79,9 @@ final class USDSceneImporter {
                             albedoTexture: albedo,
                             normalTexture: nil,
                             displacementTexture: nil,
-                            specularStrength: Self.sponzaSpecularStrength
+                            specularStrength: Self.sponzaSpecularStrength,
+                            roughness: 0.65,
+                            opacity: 1.0
                         )
                     ))
                 )
