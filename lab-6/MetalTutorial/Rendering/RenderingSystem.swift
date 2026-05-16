@@ -2,6 +2,17 @@ import Metal
 import MetalKit
 import simd
 
+struct RenderViewport {
+    var viewport: MTLViewport
+    var scissorRect: MTLScissorRect
+    var gBufferUVTransform: simd_float4
+}
+
+struct DebugLineVertex {
+    var position: simd_float3
+    var color: simd_float4
+}
+
 struct MaterialDrawState {
     var albedoTexture: MTLTexture?
     var normalTexture: MTLTexture?
@@ -160,11 +171,13 @@ final class RenderingSystem {
     private let tessellationGeometryPSO: MTLRenderPipelineState
     private let tessellationTransparentPSO: MTLRenderPipelineState
     private let lightingPSO: MTLRenderPipelineState
+    private let debugLinePSO: MTLRenderPipelineState
     private let tessellationFactorCSO: MTLComputePipelineState
 
     private let depthStateGeometry: MTLDepthStencilState
     private let depthStateLighting: MTLDepthStencilState
     private let depthStateTransparent: MTLDepthStencilState
+    private let depthStateDebug: MTLDepthStencilState
 
     private let vertexDescriptor: MTLVertexDescriptor
     private let fallbackAlbedoTexture: MTLTexture
@@ -201,11 +214,13 @@ final class RenderingSystem {
         self.tessellationGeometryPSO = RenderingSystem.buildTessellationGeometryPSO(device: device, library: library)
         self.tessellationTransparentPSO = RenderingSystem.buildTessellationTransparentPSO(device: device, library: library, view: view)
         self.lightingPSO = RenderingSystem.buildLightingPSO(device: device, library: library, view: view)
+        self.debugLinePSO = RenderingSystem.buildDebugLinePSO(device: device, library: library, view: view)
         self.tessellationFactorCSO = RenderingSystem.buildTessellationFactorCSO(device: device, library: library)
         // Depth settings differ by pass: geometry writes depth, lighting ignores it.
         self.depthStateGeometry = RenderingSystem.buildDepthState(device: device, compare: .less, write: true)
         self.depthStateLighting = RenderingSystem.buildDepthState(device: device, compare: .always, write: false)
         self.depthStateTransparent = RenderingSystem.buildDepthState(device: device, compare: .lessEqual, write: false)
+        self.depthStateDebug = RenderingSystem.buildDepthState(device: device, compare: .always, write: false)
     }
 
     func resize(viewSize: CGSize) { gbuffer.resize(to: viewSize) }
@@ -214,13 +229,20 @@ final class RenderingSystem {
         debugPreviewMode = mode
     }
 
+    private func apply(renderViewport: RenderViewport?, encoder: MTLRenderCommandEncoder) {
+        guard let renderViewport else { return }
+        encoder.setViewport(renderViewport.viewport)
+        encoder.setScissorRect(renderViewport.scissorRect)
+    }
+
     func encodeGeometryPass(commandBuffer: MTLCommandBuffer,
                             drawCalls: [GeometryDrawCall],
                             rendererKind: GeometryRendererKind,
                             cameraPosition: simd_float3,
                             time: Float,
                             viewMatrix: simd_float4x4,
-                            projectionMatrix: simd_float4x4) {
+                            projectionMatrix: simd_float4x4,
+                            renderViewport: RenderViewport? = nil) {
         let hasTessellatedGeometry = drawCalls.contains {
             if case .tessellated = $0 { return true }
             return false
@@ -237,6 +259,7 @@ final class RenderingSystem {
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         encoder.label = "GeometryPass"
         encoder.setDepthStencilState(depthStateGeometry)
+        apply(renderViewport: renderViewport, encoder: encoder)
 
         switch rendererKind {
         case .deferredIndexed:
@@ -277,7 +300,8 @@ final class RenderingSystem {
                             points: [MtlPointLight],
                             spots: [MtlSpotLight],
                             inverseView: simd_float4x4,
-                            inverseProjection: simd_float4x4) {
+                            inverseProjection: simd_float4x4,
+                            renderViewport: RenderViewport? = nil) {
         // Pass 2 (deferred): fullscreen resolve from G-Buffer + lights to final color.
         let colorAttachment = renderPassDescriptor.colorAttachments[0]
         colorAttachment?.loadAction = .clear
@@ -289,6 +313,7 @@ final class RenderingSystem {
         encoder.label = "LightingPass"
         encoder.setRenderPipelineState(lightingPSO)
         encoder.setDepthStencilState(depthStateLighting)
+        apply(renderViewport: renderViewport, encoder: encoder)
 
         // Bind G-Buffer attachments as read-only shader inputs.
         encoder.setFragmentTexture(gbuffer.albedo, index: 0)
@@ -304,6 +329,7 @@ final class RenderingSystem {
         var invView = inverseView
         var invProj = inverseProjection
         var previewMode = debugPreviewMode.rawValue
+        var uvTransform = renderViewport?.gBufferUVTransform ?? simd_float4(1.0, 1.0, 0.0, 0.0)
 
         encoder.setFragmentBytes(&eye, length: MemoryLayout<simd_float3>.stride, index: 0)
         encoder.setFragmentBytes(&ambientLight, length: MemoryLayout<MtlAmbientLight>.stride, index: 1)
@@ -349,6 +375,7 @@ final class RenderingSystem {
         encoder.setFragmentBytes(&invView, length: MemoryLayout<simd_float4x4>.stride, index: 7)
         encoder.setFragmentBytes(&invProj, length: MemoryLayout<simd_float4x4>.stride, index: 8)
         encoder.setFragmentBytes(&previewMode, length: MemoryLayout<Int32>.stride, index: 9)
+        encoder.setFragmentBytes(&uvTransform, length: MemoryLayout<simd_float4>.stride, index: 10)
 
         // Fullscreen single-triangle draw avoids seam issues and minimizes setup.
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
@@ -366,7 +393,8 @@ final class RenderingSystem {
                                debugPreviewMode: DebugPreviewMode,
                                time: Float,
                                viewMatrix: simd_float4x4,
-                               projectionMatrix: simd_float4x4) {
+                               projectionMatrix: simd_float4x4,
+                               renderViewport: RenderViewport? = nil) {
         guard drawCalls.contains(where: \.isTransparent) else { return }
 
         let descriptor = MTLRenderPassDescriptor()
@@ -384,6 +412,7 @@ final class RenderingSystem {
         encoder.setDepthStencilState(depthStateTransparent)
         encoder.setCullMode(.none)
         encoder.setFrontFacing(.clockwise)
+        apply(renderViewport: renderViewport, encoder: encoder)
         if debugPreviewMode == .wireframe {
             encoder.setTriangleFillMode(.lines)
         }
@@ -460,6 +489,40 @@ final class RenderingSystem {
             )
         }
 
+        encoder.endEncoding()
+    }
+
+    func encodeDebugLinePass(commandBuffer: MTLCommandBuffer,
+                             drawableTexture: MTLTexture,
+                             lines: [DebugLineVertex],
+                             viewMatrix: simd_float4x4,
+                             projectionMatrix: simd_float4x4,
+                             renderViewport: RenderViewport? = nil) {
+        guard !lines.isEmpty else { return }
+        guard let lineBuffer = device.makeBuffer(
+            bytes: lines,
+            length: MemoryLayout<DebugLineVertex>.stride * lines.count,
+            options: .storageModeShared
+        ) else { return }
+
+        let descriptor = MTLRenderPassDescriptor()
+        let colorAttachment = descriptor.colorAttachments[0]!
+        colorAttachment.texture = drawableTexture
+        colorAttachment.loadAction = .load
+        colorAttachment.storeAction = .store
+
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+        encoder.label = "CullingDebugLinePass"
+        encoder.setRenderPipelineState(debugLinePSO)
+        encoder.setDepthStencilState(depthStateDebug)
+        apply(renderViewport: renderViewport, encoder: encoder)
+
+        var view = viewMatrix
+        var projection = projectionMatrix
+        encoder.setVertexBuffer(lineBuffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&view, length: MemoryLayout<simd_float4x4>.stride, index: 1)
+        encoder.setVertexBytes(&projection, length: MemoryLayout<simd_float4x4>.stride, index: 2)
+        encoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: lines.count)
         encoder.endEncoding()
     }
 
@@ -692,6 +755,22 @@ final class RenderingSystem {
         descriptor.fragmentFunction = library.makeFunction(name: "fragmentLighting")
         descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
         descriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
+        return try! device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
+    private static func buildDebugLinePSO(device: MTLDevice, library: MTLLibrary, view: MTKView) -> MTLRenderPipelineState {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "DebugLinePSO"
+        descriptor.vertexFunction = library.makeFunction(name: "vertexDebugLine")
+        descriptor.fragmentFunction = library.makeFunction(name: "fragmentDebugLine")
+        descriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].rgbBlendOperation = .add
+        descriptor.colorAttachments[0].alphaBlendOperation = .add
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         return try! device.makeRenderPipelineState(descriptor: descriptor)
     }
 

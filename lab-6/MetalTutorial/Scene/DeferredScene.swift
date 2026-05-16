@@ -19,6 +19,7 @@ final class DeferredScene: RenderScene {
         var planeWaveSpeed: Float = 1.3
         var planeSpecularStrength: Float = 0.22
         var planeRoughness: Float = 0.88
+        var objectInstanceCount: Int = 10000
     }
 
     let ambientLight: MtlAmbientLight
@@ -30,13 +31,16 @@ final class DeferredScene: RenderScene {
     let preferredCameraPosition: simd_float3
     let preferredCameraYaw: Float
     let preferredCameraPitch: Float
+    let sceneBounds: AABB
     let settings: Settings
 
-    private let drawCalls: [GeometryDrawCall]
+    private let objects: [CullingObject]
+    private let octree: Octree
 
     init(device: MTLDevice, geometryVertexDescriptor: MTLVertexDescriptor, settings: Settings = Settings()) {
         self.settings = settings
         let importer = USDSceneImporter(device: device)
+        let baseCubeDrawCall = GeometryPrimitives.makeCubeDrawCall(device: device)
         let planeTextures = TextureSetLoader(device: device).loadTextureSet(
             albedo: (name: "cliff_side_diff_2k", ext: "jpg"),
             normal: (name: "cliff_side_nor_2k", ext: "jpg"),
@@ -81,9 +85,14 @@ final class DeferredScene: RenderScene {
                 opacity: 0.38
             )
         ))
+        let planeLocalBounds = AABB(
+            min: simd_float3(terrain.boundsMin.x, -settings.planeDisplacementScale - settings.planeWaveAmplitude, terrain.boundsMin.y),
+            max: simd_float3(terrain.boundsMax.x, settings.planeDisplacementScale + settings.planeWaveAmplitude, terrain.boundsMax.y)
+        )
 
+        var loadedObjects: [CullingObject]
         if let geometry = importer.loadSponzaScene(vertexDescriptor: geometryVertexDescriptor) {
-            self.drawCalls = geometry.drawCalls + [planeDrawCall]
+            loadedObjects = geometry.objects
             self.prefersOrbitingCamera = false
             self.preferredCameraPosition = simd_float3(0.0, 4.0, 15.0)
             self.preferredCameraYaw = -.pi / 2.0
@@ -103,27 +112,138 @@ final class DeferredScene: RenderScene {
             self.spotLights = [
                 MtlSpotLight(position: simd_float3(-0.0, 300.0, 0.0), direction: simd_normalize(simd_float3(1.0, 0.0, 0.0)), color: simd_float3(1.0, 0.0, 0.0), intensity: 28.0, innerCos: cos(12.0 * .pi / 180.0), outerCos: cos(22.0 * .pi / 180.0), radius: 1800.0)
             ]
-            print("[Renderer] Loaded Deferred scene: Sponza + Tessellated Plane (\(self.drawCalls.count) draw calls)")
-            return
+            print("[Renderer] Loaded Sponza geometry: \(geometry.objects.count) culling objects")
+        } else {
+            loadedObjects = [
+                CullingObject(
+                    id: 0,
+                    bounds: AABB(min: simd_float3(repeating: -0.5), max: simd_float3(repeating: 0.5)),
+                    drawCalls: [baseCubeDrawCall],
+                    label: "Fallback Cube"
+                )
+            ]
+            self.prefersOrbitingCamera = true
+            self.preferredCameraPosition = simd_float3(0.0, 4.0, 15.0)
+            self.preferredCameraYaw = -.pi / 2.0
+            self.preferredCameraPitch = 0.0
+            self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.10)
+            self.directionalLight = MtlDirectionalLight(
+                direction: simd_normalize(simd_float3(-0.45, -1.0, -0.2)),
+                color: simd_float3(1.0, 1.0, 1.0),
+                intensity: 0.22
+            )
+            self.pointLights = []
+            self.spotLights = []
+            print("[Renderer] Loaded Deferred fallback scene: Cube")
         }
 
-        self.drawCalls = [GeometryPrimitives.makeCubeDrawCall(device: device), planeDrawCall]
-        self.prefersOrbitingCamera = true
-        self.preferredCameraPosition = simd_float3(0.0, 4.0, 15.0)
-        self.preferredCameraYaw = -.pi / 2.0
-        self.preferredCameraPitch = 0.0
-        self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.10)
-        self.directionalLight = MtlDirectionalLight(
-            direction: simd_normalize(simd_float3(-0.45, -1.0, -0.2)),
-            color: simd_float3(1.0, 1.0, 1.0),
-            intensity: 0.22
+        var nextObjectID = loadedObjects.count
+        let scatterObjects = Self.makeScatterObjects(
+            baseDrawCall: baseCubeDrawCall,
+            startID: nextObjectID,
+            count: settings.objectInstanceCount
         )
-        self.pointLights = []
-        self.spotLights = []
-        print("[Renderer] Loaded Deferred fallback scene: Cube")
+        loadedObjects.append(contentsOf: scatterObjects)
+        nextObjectID += scatterObjects.count
+
+        loadedObjects.append(
+            CullingObject(
+                id: nextObjectID,
+                bounds: planeLocalBounds.transformed(by: planeModelMatrix),
+                drawCalls: [planeDrawCall],
+                label: "Tessellated Plane"
+            )
+        )
+
+        self.objects = loadedObjects
+        self.sceneBounds = Self.computeSceneBounds(objects: loadedObjects)
+        self.octree = Octree(objects: loadedObjects)
+        let drawCallCount = loadedObjects.reduce(0) { $0 + $1.drawCalls.count }
+        print("[Renderer] Deferred scene ready: \(loadedObjects.count) culling objects, \(drawCallCount) draw calls")
     }
 
-    func makeDrawCalls(cameraPosition: simd_float3) -> [GeometryDrawCall] {
-        drawCalls
+    func makeFrameData(viewMatrix: simd_float4x4,
+                       projectionMatrix: simd_float4x4,
+                       cullingOptions: CullingOptions) -> SceneFrameData {
+        SceneCullingEvaluator.makeFrameData(
+            objects: objects,
+            octree: octree,
+            sceneBounds: sceneBounds,
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            options: cullingOptions
+        )
+    }
+
+    private static func makeScatterObjects(baseDrawCall: GeometryDrawCall,
+                                           startID: Int,
+                                           count: Int) -> [CullingObject] {
+        guard count > 0, case var .indexed(baseIndexedDrawCall) = baseDrawCall else { return [] }
+
+        let columns = 50
+        let spacing: Float = 90.0
+        let unitCubeBounds = AABB(min: simd_float3(repeating: -0.5), max: simd_float3(repeating: 0.5))
+        var objects: [CullingObject] = []
+        objects.reserveCapacity(count)
+
+        for index in 0 ..< count {
+            let column = index % columns
+            let row = index / columns
+            let jitterX = (hash01(index * 17 + 3) - 0.5) * spacing * 0.55
+            let jitterZ = (hash01(index * 29 + 11) - 0.5) * spacing * 0.55
+            var x = (Float(column) - Float(columns) * 0.5) * spacing + jitterX
+            var z = (Float(row) - Float(max(count / columns, 1)) * 0.5) * spacing + jitterZ
+
+            if abs(x) < 420.0 && abs(z) < 420.0 {
+                z += z >= 0 ? 520.0 : -520.0
+                x += x >= 0 ? 120.0 : -120.0
+            }
+
+            let scale = simd_float3(
+                18.0 + hash01(index * 5 + 1) * 34.0,
+                14.0 + hash01(index * 7 + 9) * 70.0,
+                18.0 + hash01(index * 13 + 5) * 34.0
+            )
+
+            var model = matrix_identity_float4x4
+            translateMatrix(matrix: &model, position: simd_float3(x, scale.y * 0.5, z))
+            rotateMatrix(matrix: &model, rotation: simd_float3(0.0, hash01(index * 19 + 21) * .pi, 0.0))
+            scaleMatrix(matrix: &model, scale: scale)
+
+            baseIndexedDrawCall.modelMatrix = model
+            baseIndexedDrawCall.material = MaterialDrawState(
+                albedoTexture: baseIndexedDrawCall.material.albedoTexture,
+                normalTexture: nil,
+                displacementTexture: nil,
+                specularStrength: 0.08,
+                roughness: 0.82,
+                opacity: 1.0
+            )
+
+            objects.append(
+                CullingObject(
+                    id: startID + index,
+                    bounds: unitCubeBounds.transformed(by: model),
+                    drawCalls: [.indexed(baseIndexedDrawCall)],
+                    label: "Scatter \(index)"
+                )
+            )
+        }
+
+        return objects
+    }
+
+    private static func computeSceneBounds(objects: [CullingObject]) -> AABB {
+        objects.reduce(AABB.empty) { partial, object in
+            partial.union(object.bounds)
+        }
+    }
+
+    private static func hash01(_ value: Int) -> Float {
+        var x = UInt32(truncatingIfNeeded: value)
+        x = x &* 747_796_405 &+ 2_891_336_453
+        x = ((x >> ((x >> 28) + 4)) ^ x) &* 277_803_737
+        x = (x >> 22) ^ x
+        return Float(x) / Float(UInt32.max)
     }
 }

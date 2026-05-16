@@ -5,7 +5,7 @@ import ModelIO
 import simd
 
 struct SceneGeometry {
-    let drawCalls: [GeometryDrawCall]
+    let objects: [CullingObject]
 }
 
 protocol RenderScene {
@@ -18,8 +18,11 @@ protocol RenderScene {
     var preferredCameraPosition: simd_float3 { get }
     var preferredCameraYaw: Float { get }
     var preferredCameraPitch: Float { get }
+    var sceneBounds: AABB { get }
 
-    func makeDrawCalls(cameraPosition: simd_float3) -> [GeometryDrawCall]
+    func makeFrameData(viewMatrix: simd_float4x4,
+                       projectionMatrix: simd_float4x4,
+                       cullingOptions: CullingOptions) -> SceneFrameData
 }
 
 final class USDSceneImporter {
@@ -48,7 +51,7 @@ final class USDSceneImporter {
         let asset = MDLAsset(url: sceneURL, vertexDescriptor: mdlVertexDescriptor, bufferAllocator: allocator)
 
         let textureLoadingOptions: [MTKTextureLoader.Option: Any] = [.SRGB: true]
-        var drawCalls: [GeometryDrawCall] = []
+        var objects: [CullingObject] = []
         asset.loadTextures()
 
         let mdlMeshes = (asset.childObjects(of: MDLMesh.self) as? [MDLMesh]) ?? []
@@ -61,11 +64,12 @@ final class USDSceneImporter {
 
             guard let mtkMesh = try? MTKMesh(mesh: mdlMesh, device: device) else { continue }
 
+            var meshDrawCalls: [GeometryDrawCall] = []
             for (index, mtkSubmesh) in mtkMesh.submeshes.enumerated() {
                 let mdlSubmesh = mdlMesh.submeshes?[index] as? MDLSubmesh
                 let albedo = mdlSubmesh.flatMap { loadBaseColorTexture(from: $0.material, textureLoadingOptions: textureLoadingOptions) }
 
-                drawCalls.append(
+                meshDrawCalls.append(
                     .indexed(IndexedGeometryDrawCall(
                         vertexBuffer: mtkMesh.vertexBuffers[0].buffer,
                         vertexBufferOffset: mtkMesh.vertexBuffers[0].offset,
@@ -86,14 +90,27 @@ final class USDSceneImporter {
                     ))
                 )
             }
+
+            guard !meshDrawCalls.isEmpty else { continue }
+
+            let boundingBox = mdlMesh.boundingBox
+            let bounds = AABB(min: boundingBox.minBounds, max: boundingBox.maxBounds)
+            objects.append(
+                CullingObject(
+                    id: objects.count,
+                    bounds: bounds,
+                    drawCalls: meshDrawCalls,
+                    label: mdlMesh.name.isEmpty ? "Sponza mesh \(objects.count)" : mdlMesh.name
+                )
+            )
         }
 
-        guard !drawCalls.isEmpty else {
+        guard !objects.isEmpty else {
             print("[USDSceneImporter] Sponza asset found but no renderable geometry created")
             return nil
         }
 
-        return SceneGeometry(drawCalls: drawCalls)
+        return SceneGeometry(objects: objects)
     }
 
     private func loadBaseColorTexture(from material: MDLMaterial?, textureLoadingOptions: [MTKTextureLoader.Option: Any]) -> MTLTexture? {

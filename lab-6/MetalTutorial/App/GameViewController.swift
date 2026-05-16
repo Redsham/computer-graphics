@@ -11,6 +11,7 @@ class GameViewController: NSViewController {
     private let hudLabel = NSTextField(labelWithString: "FPS : --\nMode: Lit")
     private var latestFPSDisplay = "--"
     private var latestModeDisplay = "Lit"
+    private var latestCullingDisplay = "Culling: Off\nOctree : Off\nSplit  : Off\nObjects: --\nNodes  : --"
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -43,6 +44,12 @@ class GameViewController: NSViewController {
         renderer.onDebugModeUpdate = { [weak self] modeName in
             DispatchQueue.main.async {
                 self?.latestModeDisplay = modeName
+                self?.updateHUDLabel()
+            }
+        }
+        renderer.onCullingStateUpdate = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.latestCullingDisplay = Self.formatCullingState(state)
                 self?.updateHUDLabel()
             }
         }
@@ -87,6 +94,19 @@ class GameViewController: NSViewController {
                 return nil
             }
 
+            if event.keyCode == 98, !event.isARepeat { // F7
+                renderer.toggleFrustumCulling()
+                return nil
+            }
+            if event.keyCode == 100, !event.isARepeat { // F8
+                renderer.toggleOctreeCulling()
+                return nil
+            }
+            if event.keyCode == 101, !event.isARepeat { // F9
+                renderer.toggleSplitScreenDebug()
+                return nil
+            }
+
             guard let mode = modeByKeyCode[event.keyCode] else { return event }
             renderer.setDebugPreviewMode(index: mode)
             print("[Renderer] Debug preview mode -> F\(mode)")
@@ -118,12 +138,26 @@ class GameViewController: NSViewController {
         NSLayoutConstraint.activate([
             hudLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
             hudLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
-            hudLabel.widthAnchor.constraint(equalToConstant: 170),
-            hudLabel.heightAnchor.constraint(equalToConstant: 44)
+            hudLabel.widthAnchor.constraint(equalToConstant: 260),
+            hudLabel.heightAnchor.constraint(equalToConstant: 126)
         ])
     }
 
     private func updateHUDLabel() {
-        hudLabel.stringValue = "FPS : \(latestFPSDisplay)\nMode: \(latestModeDisplay)"
+        hudLabel.stringValue = "FPS : \(latestFPSDisplay)\nMode: \(latestModeDisplay)\n\(latestCullingDisplay)"
+    }
+
+    private static func formatCullingState(_ state: RendererCullingHUDState) -> String {
+        let culling = state.frustumEnabled ? "On" : "Off"
+        let octree = state.octreeEnabled ? "On" : "Off"
+        let split = state.splitDebugEnabled ? "On" : "Off"
+        let stats = state.stats
+        return """
+        Culling: \(culling)
+        Octree : \(octree)
+        Split  : \(split)
+        Objects: \(stats.visibleObjects)/\(stats.totalObjects)
+        Culled : \(stats.culledObjects)  Nodes: \(stats.visitedOctreeNodes)
+        """
     }
 }

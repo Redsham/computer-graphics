@@ -204,7 +204,8 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
                                  const device MtlSpotLight *spotLights [[buffer(6)]],
                                  constant float4x4 &invView [[buffer(7)]],
                                  constant float4x4 &invProj [[buffer(8)]],
-                                 constant int &previewMode [[buffer(9)]]) {
+                                 constant int &previewMode [[buffer(9)]],
+                                 constant float4 &gBufferUVTransform [[buffer(10)]]) {
     // Deferred lighting stage:
     // 1) read packed G-Buffer,
     // 2) reconstruct world position from depth,
@@ -212,7 +213,7 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
     // 4) optionally output debug visualizations.
     constexpr sampler nearestClamp(address::clamp_to_edge, filter::nearest);
 
-    float2 uv = clamp(in.uv, 0.0, 1.0);
+    float2 uv = clamp(in.uv * gBufferUVTransform.xy + gBufferUVTransform.zw, 0.0, 1.0);
     float4 gAlbedoSample = gAlbedo.sample(nearestClamp, uv);
     float3 albedo = gAlbedoSample.rgb;
     float4 gNormalSample = gNormal.sample(nearestClamp, uv);
@@ -283,4 +284,29 @@ fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
 
     float3 backgroundColor = float3(0.03, 0.04, 0.055);
     return float4(mix(backgroundColor, color, opacity), 1.0);
+}
+
+struct DebugLineVertex {
+    float3 position;
+    float4 color;
+};
+
+struct VSOutDebugLine {
+    float4 position [[position]];
+    float4 color;
+};
+
+vertex VSOutDebugLine vertexDebugLine(uint vertexID [[vertex_id]],
+                                      const device DebugLineVertex *vertices [[buffer(0)]],
+                                      constant float4x4 &view [[buffer(1)]],
+                                      constant float4x4 &projection [[buffer(2)]]) {
+    DebugLineVertex in = vertices[vertexID];
+    VSOutDebugLine out;
+    out.position = projection * view * float4(in.position, 1.0);
+    out.color = in.color;
+    return out;
+}
+
+fragment float4 fragmentDebugLine(VSOutDebugLine in [[stage_in]]) {
+    return in.color;
 }

@@ -29,9 +29,12 @@ final class TessellationScene: RenderScene {
     let preferredCameraPosition: simd_float3
     let preferredCameraYaw: Float
     let preferredCameraPitch: Float
+    let sceneBounds: AABB
     let settings: Settings
 
     private let drawCall: GeometryDrawCall
+    private let objects: [CullingObject]
+    private let octree: Octree
 
     init(device: MTLDevice, settings: Settings = Settings()) {
         self.settings = settings
@@ -50,7 +53,7 @@ final class TessellationScene: RenderScene {
             minDistance: settings.minDistance,
             maxDistance: settings.maxDistance
         )
-        self.drawCall = .tessellated(TessellatedGeometryDrawCall(
+        let terrainDrawCall: GeometryDrawCall = .tessellated(TessellatedGeometryDrawCall(
             controlPointBuffer: terrain.controlPointBuffer,
             patchInfoBuffer: terrain.patchInfoBuffer,
             tessellationFactorBuffer: terrain.tessellationFactorBuffer,
@@ -77,6 +80,22 @@ final class TessellationScene: RenderScene {
                 opacity: 0.38
             )
         ))
+        let localBounds = AABB(
+            min: simd_float3(terrain.boundsMin.x, -settings.displacementScale - settings.waveAmplitude, terrain.boundsMin.y),
+            max: simd_float3(terrain.boundsMax.x, settings.displacementScale + settings.waveAmplitude, terrain.boundsMax.y)
+        )
+        let sceneObjects = [
+            CullingObject(
+                id: 0,
+                bounds: localBounds,
+                drawCalls: [terrainDrawCall],
+                label: "Tessellated Patch"
+            )
+        ]
+        self.drawCall = terrainDrawCall
+        self.objects = sceneObjects
+        self.sceneBounds = localBounds
+        self.octree = Octree(objects: sceneObjects)
         self.ambientLight = MtlAmbientLight(color: simd_float3(1.0, 0.98, 0.95), intensity: 0.5)
         self.directionalLight = MtlDirectionalLight(
             direction: simd_normalize(simd_float3(-0.35, -1.0, -0.1)),
@@ -91,8 +110,16 @@ final class TessellationScene: RenderScene {
         self.preferredCameraPitch = -0.35
     }
 
-    func makeDrawCalls(cameraPosition: simd_float3) -> [GeometryDrawCall] {
-        _ = cameraPosition
-        return [drawCall]
+    func makeFrameData(viewMatrix: simd_float4x4,
+                       projectionMatrix: simd_float4x4,
+                       cullingOptions: CullingOptions) -> SceneFrameData {
+        SceneCullingEvaluator.makeFrameData(
+            objects: objects,
+            octree: octree,
+            sceneBounds: sceneBounds,
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            options: cullingOptions
+        )
     }
 }
