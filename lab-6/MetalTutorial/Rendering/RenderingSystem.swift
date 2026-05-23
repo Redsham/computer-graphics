@@ -30,6 +30,7 @@ struct IndexedGeometryDrawCall {
     var indexCount: Int
     var indexType: MTLIndexType
     var primitiveType: MTLPrimitiveType
+    var cullMode: MTLCullMode = .back
     var modelMatrix: simd_float4x4
     var material: MaterialDrawState
 }
@@ -553,7 +554,6 @@ final class RenderingSystem {
                                        projectionMatrix: simd_float4x4,
                                        cameraPosition: simd_float3) {
         encoder.setRenderPipelineState(indexedGeometryPSO)
-        encoder.setCullMode(.back)
         encoder.setFrontFacing(.counterClockwise)
         if debugPreviewMode == .wireframe {
             encoder.setTriangleFillMode(.lines)
@@ -568,6 +568,8 @@ final class RenderingSystem {
 
         for drawCall in drawCalls {
             guard case let .indexed(indexedDrawCall) = drawCall, indexedDrawCall.material.opacity >= 0.999 else { continue }
+
+            encoder.setCullMode(indexedDrawCall.cullMode)
 
             var model = indexedDrawCall.modelMatrix
             var surfaceParams = simd_float2.zero

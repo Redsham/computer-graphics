@@ -139,7 +139,7 @@ class GameViewController: NSViewController {
             hudLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
             hudLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
             hudLabel.widthAnchor.constraint(equalToConstant: 260),
-            hudLabel.heightAnchor.constraint(equalToConstant: 126)
+            hudLabel.heightAnchor.constraint(equalToConstant: 168)
         ])
     }
 
@@ -152,12 +152,16 @@ class GameViewController: NSViewController {
         let octree = state.octreeEnabled ? "On" : "Off"
         let split = state.splitDebugEnabled ? "On" : "Off"
         let stats = state.stats
-        return """
+        var lines = """
         Culling: \(culling)
         Octree : \(octree)
         Split  : \(split)
         Objects: \(stats.visibleObjects)/\(stats.totalObjects)
         Culled : \(stats.culledObjects)  Nodes: \(stats.visitedOctreeNodes)
         """
+        if let sceneStatus = state.sceneStatus {
+            lines += "\n\(sceneStatus)"
+        }
+        return lines
     }
 }

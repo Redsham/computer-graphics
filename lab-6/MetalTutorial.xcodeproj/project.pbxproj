@@ -26,6 +26,10 @@
 		D8B4B2E42AF573A50053AAE4 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D8B4B2E22AF573A50053AAE4 /* Main.storyboard */; };
 		E10000013030000000A10001 /* DeferredScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10002 /* DeferredScene.swift */; };
 		E10000013030000000A10003 /* TessellationScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10004 /* TessellationScene.swift */; };
+		E10000013030000000A10005 /* LODScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10006 /* LODScene.swift */; };
+		E10000013030000000A10007 /* Suzanne.usdc in Resources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A10008 /* Suzanne.usdc */; };
+		E10000013030000000A10009 /* Billboard_Suzanne.png in Resources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A1000A /* Billboard_Suzanne.png */; };
+		E10000013030000000A1000B /* textures in Resources */ = {isa = PBXBuildFile; fileRef = E10000013030000000A1000C /* textures */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +54,10 @@
 		D8B4B2E52AF573A50053AAE4 /* MetalTutorial.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MetalTutorial.entitlements; sourceTree = "<group>"; };
 		E10000013030000000A10002 /* DeferredScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeferredScene.swift; sourceTree = "<group>"; };
 		E10000013030000000A10004 /* TessellationScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TessellationScene.swift; sourceTree = "<group>"; };
+		E10000013030000000A10006 /* LODScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LODScene.swift; sourceTree = "<group>"; };
+		E10000013030000000A10008 /* Suzanne.usdc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Suzanne.usdc; sourceTree = "<group>"; };
+		E10000013030000000A1000A /* Billboard_Suzanne.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Billboard_Suzanne.png; sourceTree = "<group>"; };
+		E10000013030000000A1000C /* textures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = textures; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -74,6 +82,9 @@
 				B64421F72F7AC55400FD4297 /* cliff_side_diff_2k.jpg */,
 				B64421F82F7AC55400FD4297 /* cliff_side_disp_2k.png */,
 				B65EA13F2F773A0A00ECBCC0 /* Sponza_Scene.usdz */,
+				E10000013030000000A10008 /* Suzanne.usdc */,
+				E10000013030000000A1000A /* Billboard_Suzanne.png */,
+				E10000013030000000A1000C /* textures */,
 			);
 			path = Assets;
 			sourceTree = "<group>";
@@ -103,6 +114,7 @@
 			children = (
 				E10000013030000000A10002 /* DeferredScene.swift */,
 				E10000013030000000A10004 /* TessellationScene.swift */,
+				E10000013030000000A10006 /* LODScene.swift */,
 				B65EA14C2F7743E100ECBCC0 /* USDSceneImporter.swift */,
 			);
 			path = Scene;
@@ -221,6 +233,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				B65EA1402F773A0A00ECBCC0 /* Sponza_Scene.usdz in Resources */,
+				E10000013030000000A10007 /* Suzanne.usdc in Resources */,
+				E10000013030000000A10009 /* Billboard_Suzanne.png in Resources */,
+				E10000013030000000A1000B /* textures in Resources */,
 				B64421F92F7AC55400FD4297 /* cliff_side_diff_2k.jpg in Resources */,
 				B64421FA2F7AC55400FD4297 /* cliff_side_disp_2k.png in Resources */,
 				D8B4B2E12AF573A50053AAE4 /* Assets.xcassets in Resources */,
@@ -248,6 +263,7 @@
 				D8B4B2D82AF573A40053AAE4 /* AppDelegate.swift in Sources */,
 				E10000013030000000A10001 /* DeferredScene.swift in Sources */,
 				E10000013030000000A10003 /* TessellationScene.swift in Sources */,
+				E10000013030000000A10005 /* LODScene.swift in Sources */,
 				B65EA14E2F7743E100ECBCC0 /* USDSceneImporter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

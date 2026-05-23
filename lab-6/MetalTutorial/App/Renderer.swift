@@ -8,6 +8,7 @@ struct RendererCullingHUDState {
     var octreeEnabled: Bool
     var splitDebugEnabled: Bool
     var stats: CullingStats
+    var sceneStatus: String?
 }
 
 // Top-level frame orchestrator:
@@ -239,7 +240,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     private func loadScene(device: MTLDevice) {
-        applyScene(DeferredScene(
+        applyScene(LODScene(
             device: device,
             geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
         ))
@@ -299,7 +300,8 @@ final class Renderer: NSObject, MTKViewDelegate {
                 frustumEnabled: frustumCullingEnabled || octreeCullingEnabled,
                 octreeEnabled: octreeCullingEnabled,
                 splitDebugEnabled: splitScreenDebugEnabled,
-                stats: stats
+                stats: stats,
+                sceneStatus: scene.hudStatus
             )
         )
     }

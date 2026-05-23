@@ -63,18 +63,27 @@ struct MaterialParams {
 };
 
 fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
+                                     bool frontFacing [[front_facing]],
                                      constant MaterialParams &materialParams [[buffer(0)]],
                                      texture2d<float> albedoTex [[texture(0)]],
                                      texture2d<float> normalTex [[texture(1)]]) {
     // Write material properties into MRT G-Buffer attachments.
     constexpr sampler linearRepeat(address::repeat, filter::linear);
     GBufferOut out;
+    float4 albedoSample = float4(1.0, 1.0, 1.0, 1.0);
     if (albedoTex.get_width() == 0 || albedoTex.get_height() == 0) {
-        out.albedo = float4(1.0, 1.0, 1.0, 1.0);
+        out.albedo = albedoSample;
     } else {
-        out.albedo = float4(albedoTex.sample(linearRepeat, in.uv).rgb, 1.0);
+        albedoSample = albedoTex.sample(linearRepeat, in.uv);
+        if (albedoSample.a < 0.08) {
+            discard_fragment();
+        }
+        out.albedo = float4(albedoSample.rgb, 1.0);
     }
     float3 N = normalize(in.worldNormal);
+    if (!frontFacing) {
+        N = -N;
+    }
     if (normalTex.get_width() > 0 && normalTex.get_height() > 0) {
         float3 dPdx = dfdx(in.worldPosition);
         float3 dPdy = dfdy(in.worldPosition);
