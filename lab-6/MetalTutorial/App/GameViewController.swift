@@ -9,8 +9,11 @@ class GameViewController: NSViewController {
     var cameraController: CameraFlyController?
     var eventMonitors: [Any] = []
     private let hudLabel = NSTextField(labelWithString: "FPS : --\nMode: Lit")
+    private let thrustLabel = NSTextField(labelWithString: "Thrust 72%")
+    private let thrustSlider = NSSlider(value: 0.72, minValue: 0.0, maxValue: 1.0, target: nil, action: nil)
     private var latestFPSDisplay = "--"
     private var latestModeDisplay = "Lit"
+    private var latestThrustDisplay = "72%"
     private var latestCullingDisplay = "Culling: Off\nOctree : Off\nSplit  : Off\nObjects: --\nNodes  : --"
 
     override func viewDidLoad() {
@@ -53,6 +56,14 @@ class GameViewController: NSViewController {
                 self?.updateHUDLabel()
             }
         }
+        renderer.onThrustUpdate = { [weak self] thrust in
+            DispatchQueue.main.async {
+                self?.latestThrustDisplay = Self.formatThrust(thrust)
+                self?.thrustSlider.floatValue = thrust
+                self?.thrustLabel.stringValue = "Thrust \(Self.formatThrust(thrust))"
+                self?.updateHUDLabel()
+            }
+        }
 
         let cameraController = CameraFlyController(view: mtkView)
         renderer.setCameraController(cameraController)
@@ -62,7 +73,9 @@ class GameViewController: NSViewController {
 
         mtkView.delegate = renderer
         configureHUDLabel()
+        configureThrustControls()
         updateHUDLabel()
+        renderer.setRocketThrust(Float(thrustSlider.floatValue))
         installDebugPreviewHotkeys()
     }
 
@@ -107,6 +120,17 @@ class GameViewController: NSViewController {
                 return nil
             }
 
+            if let characters = event.charactersIgnoringModifiers, !event.isARepeat {
+                if characters == "+" || characters == "=" {
+                    renderer.adjustRocketThrust(by: 0.05)
+                    return nil
+                }
+                if characters == "-" || characters == "_" {
+                    renderer.adjustRocketThrust(by: -0.05)
+                    return nil
+                }
+            }
+
             guard let mode = modeByKeyCode[event.keyCode] else { return event }
             renderer.setDebugPreviewMode(index: mode)
             print("[Renderer] Debug preview mode -> F\(mode)")
@@ -139,12 +163,49 @@ class GameViewController: NSViewController {
             hudLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
             hudLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
             hudLabel.widthAnchor.constraint(equalToConstant: 260),
-            hudLabel.heightAnchor.constraint(equalToConstant: 168)
+            hudLabel.heightAnchor.constraint(equalToConstant: 184)
         ])
     }
 
     private func updateHUDLabel() {
-        hudLabel.stringValue = "FPS : \(latestFPSDisplay)\nMode: \(latestModeDisplay)\n\(latestCullingDisplay)"
+        hudLabel.stringValue = "FPS : \(latestFPSDisplay)\nMode: \(latestModeDisplay)\nThrust: \(latestThrustDisplay)\n\(latestCullingDisplay)"
+    }
+
+    private func configureThrustControls() {
+        thrustLabel.translatesAutoresizingMaskIntoConstraints = false
+        thrustLabel.font = .monospacedSystemFont(ofSize: 13, weight: .medium)
+        thrustLabel.textColor = NSColor(white: 0.96, alpha: 1.0)
+        thrustLabel.backgroundColor = NSColor(calibratedWhite: 0.08, alpha: 0.72)
+        thrustLabel.drawsBackground = true
+        thrustLabel.isBordered = false
+        thrustLabel.isBezeled = false
+        thrustLabel.isEditable = false
+        thrustLabel.alignment = .center
+        thrustLabel.wantsLayer = true
+        thrustLabel.layer?.cornerRadius = 6
+        thrustLabel.layer?.masksToBounds = true
+
+        thrustSlider.translatesAutoresizingMaskIntoConstraints = false
+        thrustSlider.target = self
+        thrustSlider.action = #selector(thrustSliderChanged(_:))
+        thrustSlider.isContinuous = true
+
+        view.addSubview(thrustLabel)
+        view.addSubview(thrustSlider)
+
+        NSLayoutConstraint.activate([
+            thrustLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
+            thrustLabel.topAnchor.constraint(equalTo: hudLabel.bottomAnchor, constant: 10),
+            thrustLabel.widthAnchor.constraint(equalToConstant: 132),
+            thrustLabel.heightAnchor.constraint(equalToConstant: 28),
+            thrustSlider.leadingAnchor.constraint(equalTo: thrustLabel.trailingAnchor, constant: 10),
+            thrustSlider.centerYAnchor.constraint(equalTo: thrustLabel.centerYAnchor),
+            thrustSlider.widthAnchor.constraint(equalToConstant: 188)
+        ])
+    }
+
+    @objc private func thrustSliderChanged(_ sender: NSSlider) {
+        renderer.setRocketThrust(sender.floatValue)
     }
 
     private static func formatCullingState(_ state: RendererCullingHUDState) -> String {
@@ -163,5 +224,9 @@ class GameViewController: NSViewController {
             lines += "\n\(sceneStatus)"
         }
         return lines
+    }
+
+    private static func formatThrust(_ thrust: Float) -> String {
+        "\(Int((max(0.0, min(1.0, thrust)) * 100.0).rounded()))%"
     }
 }

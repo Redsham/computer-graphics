@@ -18,11 +18,13 @@ struct RendererCullingHUDState {
 final class Renderer: NSObject, MTKViewDelegate {
     private let commandQueue: MTLCommandQueue
     private let renderingSystem: RenderingSystem
+    private let rocketParticleEffect: RocketEngineParticleEffect
 
     private var scene: (any RenderScene)!
     var onFPSUpdate: ((Double) -> Void)?
     var onDebugModeUpdate: ((String) -> Void)?
     var onCullingStateUpdate: ((RendererCullingHUDState) -> Void)?
+    var onThrustUpdate: ((Float) -> Void)?
 
     // Camera state used to build view/projection matrices every frame.
     private var viewPosition = simd_float3(0.0, 4.0, 15.0)
@@ -34,6 +36,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var frustumCullingEnabled = false
     private var octreeCullingEnabled = false
     private var splitScreenDebugEnabled = false
+    private var rocketThrust: Float = 0.72
 
     // Scene light sets consumed during deferred lighting.
     private var ambientLight: MtlAmbientLight
@@ -53,6 +56,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         metalKitView.sampleCount = 1
 
         self.renderingSystem = RenderingSystem(device: device, view: metalKitView)
+        self.rocketParticleEffect = RocketEngineParticleEffect(device: device, view: metalKitView)
 
         self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.03)
         self.dirLight = MtlDirectionalLight(direction: simd_float3(0, -1, 0), color: simd_float3(1, 1, 1), intensity: 0.0)
@@ -170,6 +174,18 @@ final class Renderer: NSObject, MTKViewDelegate {
             renderViewport: mainViewport
         )
 
+        rocketParticleEffect.encode(
+            commandBuffer: commandBuffer,
+            drawableTexture: drawable.texture,
+            depthTexture: renderingSystem.sceneDepthTexture,
+            viewMatrix: viewMat,
+            projectionMatrix: projection,
+            time: time,
+            deltaTime: deltaTime,
+            throttle: rocketThrust,
+            renderViewport: mainViewport
+        )
+
         if splitScreenDebugEnabled {
             let debugViewport = makeDebugSplitViewport(size: view.drawableSize)
             let debugCamera = makeDebugCamera(sceneBounds: frameData.sceneBounds, aspectRatio: mainAspectRatio)
@@ -239,11 +255,17 @@ final class Renderer: NSObject, MTKViewDelegate {
         print("[Renderer] Split-screen culling debug -> \(splitScreenDebugEnabled ? "On" : "Off")")
     }
 
+    func setRocketThrust(_ value: Float) {
+        rocketThrust = max(0.0, min(1.0, value))
+        onThrustUpdate?(rocketThrust)
+    }
+
+    func adjustRocketThrust(by delta: Float) {
+        setRocketThrust(rocketThrust + delta)
+    }
+
     private func loadScene(device: MTLDevice) {
-        applyScene(LODScene(
-            device: device,
-            geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
-        ))
+        applyScene(RocketEngineScene(device: device))
     }
 
     private func applyScene(_ nextScene: any RenderScene) {
@@ -255,6 +277,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         renderingSystem.setDebugPreviewMode(.lit)
         onDebugModeUpdate?(debugModeTitle(for: .lit))
         notifyCullingState(stats: CullingStats(totalObjects: 0, visibleObjects: 0, culledObjects: 0, visitedOctreeNodes: 0))
+        onThrustUpdate?(rocketThrust)
         viewPosition = scene.preferredCameraPosition
         cameraController?.setPose(
             position: scene.preferredCameraPosition,
@@ -295,13 +318,16 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     private func notifyCullingState(stats: CullingStats) {
+        let statusLines = [scene.hudStatus, rocketParticleEffect.debugStatus]
+            .compactMap { $0 }
+            .joined(separator: "\n")
         onCullingStateUpdate?(
             RendererCullingHUDState(
                 frustumEnabled: frustumCullingEnabled || octreeCullingEnabled,
                 octreeEnabled: octreeCullingEnabled,
                 splitDebugEnabled: splitScreenDebugEnabled,
                 stats: stats,
-                sceneStatus: scene.hudStatus
+                sceneStatus: statusLines.isEmpty ? nil : statusLines
             )
         )
     }

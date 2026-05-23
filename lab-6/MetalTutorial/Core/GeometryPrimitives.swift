@@ -23,6 +23,139 @@ struct TerrainPatchGeometry {
 }
 
 enum GeometryPrimitives {
+    static func makeSolidColorTexture(device: MTLDevice, color: simd_float4) -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
+        descriptor.usage = [.shaderRead]
+        descriptor.storageMode = .shared
+
+        let texture = device.makeTexture(descriptor: descriptor)!
+        let bytes = [
+            UInt8(max(0, min(255, Int(color.x * 255.0)))),
+            UInt8(max(0, min(255, Int(color.y * 255.0)))),
+            UInt8(max(0, min(255, Int(color.z * 255.0)))),
+            UInt8(max(0, min(255, Int(color.w * 255.0))))
+        ]
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0,
+            withBytes: bytes,
+            bytesPerRow: 4
+        )
+        return texture
+    }
+
+    static func makeColoredCubeDrawCall(device: MTLDevice, color: simd_float4) -> GeometryDrawCall {
+        var drawCall = makeCubeDrawCall(device: device)
+        guard case var .indexed(indexedDrawCall) = drawCall else { return drawCall }
+        indexedDrawCall.material = MaterialDrawState(
+            albedoTexture: makeSolidColorTexture(device: device, color: color),
+            normalTexture: nil,
+            displacementTexture: nil,
+            specularStrength: 0.22,
+            roughness: 0.55,
+            opacity: 1.0
+        )
+        drawCall = .indexed(indexedDrawCall)
+        return drawCall
+    }
+
+    static func makeCylinderDrawCall(device: MTLDevice,
+                                     radius: Float,
+                                     height: Float,
+                                     segments: Int = 40,
+                                     color: simd_float4) -> GeometryDrawCall {
+        let segmentCount = max(8, min(segments, 96))
+        let halfHeight = height * 0.5
+        var vertices: [Vertex] = []
+        var indices: [UInt16] = []
+        vertices.reserveCapacity(segmentCount * 4 + 2)
+        indices.reserveCapacity(segmentCount * 12)
+
+        for i in 0 ... segmentCount {
+            let angle = Float(i) / Float(segmentCount) * .pi * 2.0
+            let x = cos(angle) * radius
+            let z = sin(angle) * radius
+            let normal = simd_normalize(simd_float3(x, 0.0, z))
+            let u = Float(i) / Float(segmentCount)
+            vertices.append(Vertex(position: simd_float3(x, -halfHeight, z), normal: normal, uv: simd_float2(u, 1.0)))
+            vertices.append(Vertex(position: simd_float3(x, halfHeight, z), normal: normal, uv: simd_float2(u, 0.0)))
+        }
+
+        for i in 0 ..< segmentCount {
+            let base = UInt16(i * 2)
+            indices.append(contentsOf: [base, base + 1, base + 2, base + 1, base + 3, base + 2])
+        }
+
+        let bottomCenter = UInt16(vertices.count)
+        vertices.append(Vertex(position: simd_float3(0.0, -halfHeight, 0.0), normal: simd_float3(0.0, -1.0, 0.0), uv: simd_float2(0.5, 0.5)))
+        let topCenter = UInt16(vertices.count)
+        vertices.append(Vertex(position: simd_float3(0.0, halfHeight, 0.0), normal: simd_float3(0.0, 1.0, 0.0), uv: simd_float2(0.5, 0.5)))
+
+        for i in 0 ..< segmentCount {
+            let a = UInt16(i * 2)
+            let b = UInt16(((i + 1) % segmentCount) * 2)
+            indices.append(contentsOf: [bottomCenter, b, a])
+            indices.append(contentsOf: [topCenter, a + 1, b + 1])
+        }
+
+        return makeIndexedDrawCall(
+            device: device,
+            vertices: vertices,
+            indices: indices,
+            color: color,
+            specularStrength: 0.32,
+            roughness: 0.38
+        )
+    }
+
+    static func makeConeDrawCall(device: MTLDevice,
+                                 radius: Float,
+                                 height: Float,
+                                 segments: Int = 40,
+                                 color: simd_float4) -> GeometryDrawCall {
+        let segmentCount = max(8, min(segments, 96))
+        let halfHeight = height * 0.5
+        var vertices: [Vertex] = []
+        var indices: [UInt16] = []
+        vertices.reserveCapacity(segmentCount * 2 + 2)
+        indices.reserveCapacity(segmentCount * 6)
+
+        let slope = radius / max(height, 0.0001)
+        for i in 0 ..< segmentCount {
+            let angle = Float(i) / Float(segmentCount) * .pi * 2.0
+            let x = cos(angle) * radius
+            let z = sin(angle) * radius
+            let normal = simd_normalize(simd_float3(cos(angle), slope, sin(angle)))
+            vertices.append(Vertex(position: simd_float3(x, -halfHeight, z), normal: normal, uv: simd_float2(Float(i) / Float(segmentCount), 1.0)))
+        }
+
+        let apex = UInt16(vertices.count)
+        vertices.append(Vertex(position: simd_float3(0.0, halfHeight, 0.0), normal: simd_float3(0.0, 1.0, 0.0), uv: simd_float2(0.5, 0.0)))
+        let bottomCenter = UInt16(vertices.count)
+        vertices.append(Vertex(position: simd_float3(0.0, -halfHeight, 0.0), normal: simd_float3(0.0, -1.0, 0.0), uv: simd_float2(0.5, 0.5)))
+
+        for i in 0 ..< segmentCount {
+            let a = UInt16(i)
+            let b = UInt16((i + 1) % segmentCount)
+            indices.append(contentsOf: [a, apex, b])
+            indices.append(contentsOf: [bottomCenter, b, a])
+        }
+
+        return makeIndexedDrawCall(
+            device: device,
+            vertices: vertices,
+            indices: indices,
+            color: color,
+            specularStrength: 0.24,
+            roughness: 0.42
+        )
+    }
+
     static func makeCubeDrawCall(device: MTLDevice) -> GeometryDrawCall {
         let vertexBuffer = device.makeBuffer(
             bytes: cubeVertices,
@@ -59,6 +192,44 @@ enum GeometryPrimitives {
                 displacementTexture: nil,
                 specularStrength: 0.45,
                 roughness: 0.35,
+                opacity: 1.0
+            )
+        ))
+    }
+
+    private static func makeIndexedDrawCall(device: MTLDevice,
+                                            vertices: [Vertex],
+                                            indices: [UInt16],
+                                            color: simd_float4,
+                                            specularStrength: Float,
+                                            roughness: Float) -> GeometryDrawCall {
+        let vertexBuffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Vertex>.stride,
+            options: .storageModeShared
+        )!
+
+        let indexBuffer = device.makeBuffer(
+            bytes: indices,
+            length: indices.count * MemoryLayout<UInt16>.stride,
+            options: .storageModeShared
+        )!
+
+        return .indexed(IndexedGeometryDrawCall(
+            vertexBuffer: vertexBuffer,
+            vertexBufferOffset: 0,
+            indexBuffer: indexBuffer,
+            indexBufferOffset: 0,
+            indexCount: indices.count,
+            indexType: .uint16,
+            primitiveType: .triangle,
+            modelMatrix: matrix_identity_float4x4,
+            material: MaterialDrawState(
+                albedoTexture: makeSolidColorTexture(device: device, color: color),
+                normalTexture: nil,
+                displacementTexture: nil,
+                specularStrength: specularStrength,
+                roughness: roughness,
                 opacity: 1.0
             )
         ))

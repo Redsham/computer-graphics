@@ -187,6 +187,7 @@ final class RenderingSystem {
     private var debugPreviewMode: DebugPreviewMode = .lit
 
     var debugPreviewModeValue: DebugPreviewMode { debugPreviewMode }
+    var sceneDepthTexture: MTLTexture { gbuffer.depth }
 
     init(device: MTLDevice, view: MTKView) {
         self.device = device
