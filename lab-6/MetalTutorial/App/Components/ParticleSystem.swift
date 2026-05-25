@@ -32,6 +32,18 @@ private struct ParticleSortKey {
     var particleIndex: UInt32
 }
 
+private struct ParticleCollisionUniforms {
+    var viewProjection: simd_float4x4
+    var inverseViewProjection: simd_float4x4
+    var uvTransform: simd_float4
+    var params: simd_float4
+    var planeCenter: simd_float4
+    var planeNormal: simd_float4
+    var planeTangent: simd_float4
+    var planeBitangent: simd_float4
+    var planeParams: simd_float4
+}
+
 private struct SortParams {
     var stage: UInt32
     var pass: UInt32
@@ -42,6 +54,14 @@ private struct SortParams {
 enum ParticleBlendMode {
     case alpha
     case additive
+}
+
+struct RocketEngineCollisionPlane {
+    var center: simd_float3
+    var normal: simd_float3
+    var tangent: simd_float3
+    var bitangent: simd_float3
+    var halfExtents: simd_float2
 }
 
 struct ParticleEmitterSettings {
@@ -64,6 +84,15 @@ struct ParticleEmitterSettings {
     var fadeInFraction: Float
     var fadeOutStartFraction: Float
     var alphaScale: Float
+    var collisionThreshold: Float
+    var collisionDamping: Float
+    var collisionAgeBoost: Float
+    var collisionPlaneCenter: simd_float3 = .zero
+    var collisionPlaneNormal: simd_float3 = simd_float3(1.0, 0.0, 0.0)
+    var collisionPlaneTangent: simd_float3 = simd_float3(0.0, 1.0, 0.0)
+    var collisionPlaneBitangent: simd_float3 = simd_float3(0.0, 0.0, 1.0)
+    var collisionPlaneHalfExtents: simd_float2 = .zero
+    var collisionPlaneEnabled: Float = 0.0
 }
 
 final class ParticleSystem {
@@ -138,7 +167,18 @@ final class ParticleSystem {
         )
 
         clearLiveCounter(commandBuffer: commandBuffer)
-        updateParticles(commandBuffer: commandBuffer, uniforms: &uniforms)
+        var collision = makeCollisionUniforms(
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            settings: settings,
+            renderViewport: renderViewport
+        )
+        updateParticles(
+            commandBuffer: commandBuffer,
+            depthTexture: depthTexture,
+            uniforms: &uniforms,
+            collision: &collision
+        )
         buildSortKeys(commandBuffer: commandBuffer, uniforms: &uniforms, viewMatrix: viewMatrix)
         sortParticles(commandBuffer: commandBuffer)
         renderParticles(
@@ -211,13 +251,45 @@ final class ParticleSystem {
         blitEncoder.endEncoding()
     }
 
-    private func updateParticles(commandBuffer: MTLCommandBuffer, uniforms: inout ParticleUniforms) {
+    private func makeCollisionUniforms(viewMatrix: simd_float4x4,
+                                       projectionMatrix: simd_float4x4,
+                                       settings: ParticleEmitterSettings,
+                                       renderViewport: RenderViewport?) -> ParticleCollisionUniforms {
+        ParticleCollisionUniforms(
+            viewProjection: projectionMatrix * viewMatrix,
+            inverseViewProjection: (projectionMatrix * viewMatrix).inverse,
+            uvTransform: renderViewport?.gBufferUVTransform ?? simd_float4(1.0, 1.0, 0.0, 0.0),
+            params: simd_float4(
+                settings.collisionThreshold,
+                settings.collisionDamping,
+                settings.collisionAgeBoost,
+                1.0
+            ),
+            planeCenter: simd_float4(settings.collisionPlaneCenter, 1.0),
+            planeNormal: simd_float4(simd_normalize(settings.collisionPlaneNormal), 0.0),
+            planeTangent: simd_float4(simd_normalize(settings.collisionPlaneTangent), 0.0),
+            planeBitangent: simd_float4(simd_normalize(settings.collisionPlaneBitangent), 0.0),
+            planeParams: simd_float4(
+                settings.collisionPlaneHalfExtents.x,
+                settings.collisionPlaneHalfExtents.y,
+                settings.collisionDamping,
+                settings.collisionPlaneEnabled
+            )
+        )
+    }
+
+    private func updateParticles(commandBuffer: MTLCommandBuffer,
+                                 depthTexture: MTLTexture,
+                                 uniforms: inout ParticleUniforms,
+                                 collision: inout ParticleCollisionUniforms) {
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else { return }
         encoder.label = "\(label) Compute"
         encoder.setComputePipelineState(computePipeline)
         encoder.setBuffer(particleBuffer, offset: 0, index: 0)
         encoder.setBuffer(liveCounterBuffer, offset: 0, index: 1)
         encoder.setBytes(&uniforms, length: MemoryLayout<ParticleUniforms>.stride, index: 2)
+        encoder.setBytes(&collision, length: MemoryLayout<ParticleCollisionUniforms>.stride, index: 3)
+        encoder.setTexture(depthTexture, index: 0)
 
         let threadsPerThreadgroup = MTLSize(width: computePipeline.threadExecutionWidth, height: 1, depth: 1)
         let threadCount = MTLSize(width: maxParticleCount, height: 1, depth: 1)
@@ -361,8 +433,6 @@ final class ParticleSystem {
 final class RocketEngineParticleEffect {
     private let fireSystem: ParticleSystem
     private let smokeSystem: ParticleSystem
-    private let emitterPosition = simd_float3(0.0, -54.0, 0.0)
-    private let exhaustDirection = simd_float3(0.0, -1.0, 0.0)
 
     var debugStatus: String {
         "Particles F/S: \(fireSystem.latestLiveCount)/\(smokeSystem.latestLiveCount)"
@@ -376,6 +446,9 @@ final class RocketEngineParticleEffect {
     func encode(commandBuffer: MTLCommandBuffer,
                 drawableTexture: MTLTexture,
                 depthTexture: MTLTexture,
+                emitterPosition: simd_float3,
+                exhaustDirection: simd_float3,
+                collisionPlane: RocketEngineCollisionPlane?,
                 viewMatrix: simd_float4x4,
                 projectionMatrix: simd_float4x4,
                 time: Float,
@@ -401,7 +474,16 @@ final class RocketEngineParticleEffect {
             colorEnd: simd_float4(0.18, 0.18, 0.19, 0.0),
             fadeInFraction: 0.08,
             fadeOutStartFraction: 0.38,
-            alphaScale: 0.30
+            alphaScale: 0.30,
+            collisionThreshold: 0.00008,
+            collisionDamping: 0.04,
+            collisionAgeBoost: 2.0,
+            collisionPlaneCenter: collisionPlane?.center ?? .zero,
+            collisionPlaneNormal: collisionPlane?.normal ?? simd_float3(1.0, 0.0, 0.0),
+            collisionPlaneTangent: collisionPlane?.tangent ?? simd_float3(0.0, 1.0, 0.0),
+            collisionPlaneBitangent: collisionPlane?.bitangent ?? simd_float3(0.0, 0.0, 1.0),
+            collisionPlaneHalfExtents: collisionPlane?.halfExtents ?? .zero,
+            collisionPlaneEnabled: collisionPlane == nil ? 0.0 : 1.0
         )
         let fire = ParticleEmitterSettings(
             position: emitterPosition,
@@ -422,7 +504,16 @@ final class RocketEngineParticleEffect {
             colorEnd: simd_float4(0.42, 0.03, 0.0, 0.0),
             fadeInFraction: 0.0,
             fadeOutStartFraction: 0.36,
-            alphaScale: 0.82
+            alphaScale: 0.82,
+            collisionThreshold: 0.00008,
+            collisionDamping: 0.02,
+            collisionAgeBoost: 24.0,
+            collisionPlaneCenter: collisionPlane?.center ?? .zero,
+            collisionPlaneNormal: collisionPlane?.normal ?? simd_float3(1.0, 0.0, 0.0),
+            collisionPlaneTangent: collisionPlane?.tangent ?? simd_float3(0.0, 1.0, 0.0),
+            collisionPlaneBitangent: collisionPlane?.bitangent ?? simd_float3(0.0, 0.0, 1.0),
+            collisionPlaneHalfExtents: collisionPlane?.halfExtents ?? .zero,
+            collisionPlaneEnabled: collisionPlane == nil ? 0.0 : 1.0
         )
 
         smokeSystem.encode(

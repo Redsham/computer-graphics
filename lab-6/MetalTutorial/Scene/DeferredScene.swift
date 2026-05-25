@@ -1,7 +1,20 @@
 import Metal
+import MetalKit
 import simd
 
 final class DeferredScene: RenderScene {
+    struct EngineParticleTransform {
+        var position: simd_float3 = simd_float3(0.0, 180.0, 0.0)
+        var rotation: simd_float3 = simd_float3(0.0, -.pi / 2.0, 0.0)
+
+        var direction: simd_float3 {
+            var rotationMatrix = matrix_identity_float4x4
+            rotateMatrix(matrix: &rotationMatrix, rotation: rotation)
+            let rotated = rotationMatrix * simd_float4(0.0, 0.0, -1.0, 0.0)
+            return simd_normalize(simd_float3(rotated.x, rotated.y, rotated.z))
+        }
+    }
+
     struct Settings {
         var planePosition: simd_float3 = simd_float3(-50.0, 450.0, 200.0)
         var planeSize: simd_float2 = simd_float2(2000.0, 600.0)
@@ -19,7 +32,12 @@ final class DeferredScene: RenderScene {
         var planeWaveSpeed: Float = 1.3
         var planeSpecularStrength: Float = 0.22
         var planeRoughness: Float = 0.88
-        var objectInstanceCount: Int = 10000
+        var objectInstanceCount: Int = 2000
+        var engineParticles: EngineParticleTransform = EngineParticleTransform()
+        var collisionTestSurfaceEnabled: Bool = true
+        var collisionTestSurfacePosition: simd_float3 = simd_float3(430.0, 180.0, 0.0)
+        var collisionTestSurfaceRotation: simd_float3 = simd_float3(0.0, 0.0, toRadians(from: -28.0))
+        var collisionTestSurfaceScale: simd_float3 = simd_float3(18.0, 260.0, 340.0)
     }
 
     let ambientLight: MtlAmbientLight
@@ -36,9 +54,23 @@ final class DeferredScene: RenderScene {
 
     private let objects: [CullingObject]
     private let octree: Octree
+    private let particleEffect: RocketEngineParticleEffect
 
-    init(device: MTLDevice, geometryVertexDescriptor: MTLVertexDescriptor, settings: Settings = Settings()) {
+    var hudStatus: String? {
+        """
+        Scene : Sponza
+        Input : slider / +/- thrust
+        GPU   : compute particles + depth collision
+        """
+    }
+
+    var particleStatus: String? {
+        particleEffect.debugStatus
+    }
+
+    init(device: MTLDevice, view: MTKView, geometryVertexDescriptor: MTLVertexDescriptor, settings: Settings = Settings()) {
         self.settings = settings
+        self.particleEffect = RocketEngineParticleEffect(device: device, view: view)
         let importer = USDSceneImporter(device: device)
         let baseCubeDrawCall = GeometryPrimitives.makeCubeDrawCall(device: device)
         let planeTextures = TextureSetLoader(device: device).loadTextureSet(
@@ -154,6 +186,19 @@ final class DeferredScene: RenderScene {
                 label: "Tessellated Plane"
             )
         )
+        nextObjectID += 1
+
+        if settings.collisionTestSurfaceEnabled,
+           let testSurface = Self.makeCollisionTestSurface(
+                baseDrawCall: GeometryPrimitives.makeColoredCubeDrawCall(
+                    device: device,
+                    color: simd_float4(0.12, 0.62, 0.95, 1.0)
+                ),
+                id: nextObjectID,
+                settings: settings
+           ) {
+            loadedObjects.append(testSurface)
+        }
 
         self.objects = loadedObjects
         self.sceneBounds = Self.computeSceneBounds(objects: loadedObjects)
@@ -172,6 +217,79 @@ final class DeferredScene: RenderScene {
             viewMatrix: viewMatrix,
             projectionMatrix: projectionMatrix,
             options: cullingOptions
+        )
+    }
+
+    func encodeParticles(commandBuffer: MTLCommandBuffer,
+                         drawableTexture: MTLTexture,
+                         depthTexture: MTLTexture,
+                         viewMatrix: simd_float4x4,
+                         projectionMatrix: simd_float4x4,
+                         time: Float,
+                         deltaTime: Float,
+                         throttle: Float,
+                         renderViewport: RenderViewport?) {
+        let transform = settings.engineParticles
+        particleEffect.encode(
+            commandBuffer: commandBuffer,
+            drawableTexture: drawableTexture,
+            depthTexture: depthTexture,
+            emitterPosition: transform.position,
+            exhaustDirection: transform.direction,
+            collisionPlane: settings.collisionTestSurfaceEnabled ? Self.makeCollisionPlane(settings: settings) : nil,
+            viewMatrix: viewMatrix,
+            projectionMatrix: projectionMatrix,
+            time: time,
+            deltaTime: deltaTime,
+            throttle: throttle,
+            renderViewport: renderViewport
+        )
+    }
+
+    private static func makeCollisionPlane(settings: Settings) -> RocketEngineCollisionPlane {
+        var rotation = matrix_identity_float4x4
+        rotateMatrix(matrix: &rotation, rotation: settings.collisionTestSurfaceRotation)
+        let normal4 = rotation * simd_float4(1.0, 0.0, 0.0, 0.0)
+        let tangent4 = rotation * simd_float4(0.0, 1.0, 0.0, 0.0)
+        let bitangent4 = rotation * simd_float4(0.0, 0.0, 1.0, 0.0)
+        return RocketEngineCollisionPlane(
+            center: settings.collisionTestSurfacePosition,
+            normal: simd_normalize(simd_float3(normal4.x, normal4.y, normal4.z)),
+            tangent: simd_normalize(simd_float3(tangent4.x, tangent4.y, tangent4.z)),
+            bitangent: simd_normalize(simd_float3(bitangent4.x, bitangent4.y, bitangent4.z)),
+            halfExtents: simd_float2(
+                settings.collisionTestSurfaceScale.y * 0.62,
+                settings.collisionTestSurfaceScale.z * 0.62
+            )
+        )
+    }
+
+    private static func makeCollisionTestSurface(baseDrawCall: GeometryDrawCall,
+                                                 id: Int,
+                                                 settings: Settings) -> CullingObject? {
+        guard case var .indexed(indexedDrawCall) = baseDrawCall else { return nil }
+
+        var model = matrix_identity_float4x4
+        translateMatrix(matrix: &model, position: settings.collisionTestSurfacePosition)
+        rotateMatrix(matrix: &model, rotation: settings.collisionTestSurfaceRotation)
+        scaleMatrix(matrix: &model, scale: settings.collisionTestSurfaceScale)
+
+        indexedDrawCall.modelMatrix = model
+        indexedDrawCall.material = MaterialDrawState(
+            albedoTexture: indexedDrawCall.material.albedoTexture,
+            normalTexture: nil,
+            displacementTexture: nil,
+            specularStrength: 0.10,
+            roughness: 0.88,
+            opacity: 1.0
+        )
+
+        let localBounds = AABB(min: simd_float3(repeating: -0.5), max: simd_float3(repeating: 0.5))
+        return CullingObject(
+            id: id,
+            bounds: localBounds.transformed(by: model),
+            drawCalls: [.indexed(indexedDrawCall)],
+            label: "Particle Collision Test Surface"
         )
     }
 

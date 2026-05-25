@@ -18,7 +18,6 @@ struct RendererCullingHUDState {
 final class Renderer: NSObject, MTKViewDelegate {
     private let commandQueue: MTLCommandQueue
     private let renderingSystem: RenderingSystem
-    private let rocketParticleEffect: RocketEngineParticleEffect
 
     private var scene: (any RenderScene)!
     var onFPSUpdate: ((Double) -> Void)?
@@ -56,7 +55,6 @@ final class Renderer: NSObject, MTKViewDelegate {
         metalKitView.sampleCount = 1
 
         self.renderingSystem = RenderingSystem(device: device, view: metalKitView)
-        self.rocketParticleEffect = RocketEngineParticleEffect(device: device, view: metalKitView)
 
         self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.03)
         self.dirLight = MtlDirectionalLight(direction: simd_float3(0, -1, 0), color: simd_float3(1, 1, 1), intensity: 0.0)
@@ -66,7 +64,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         super.init()
 
         // Build draw call list (USD scene or cube fallback).
-        loadScene(device: device)
+        loadScene(device: device, view: metalKitView)
         metalKitView.delegate = self
     }
 
@@ -174,7 +172,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             renderViewport: mainViewport
         )
 
-        rocketParticleEffect.encode(
+        scene.encodeParticles(
             commandBuffer: commandBuffer,
             drawableTexture: drawable.texture,
             depthTexture: renderingSystem.sceneDepthTexture,
@@ -264,8 +262,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         setRocketThrust(rocketThrust + delta)
     }
 
-    private func loadScene(device: MTLDevice) {
-        applyScene(RocketEngineScene(device: device))
+    private func loadScene(device: MTLDevice, view: MTKView) {
+        applyScene(DeferredScene(device: device, view: view, geometryVertexDescriptor: renderingSystem.geometryVertexDescriptorValue))
     }
 
     private func applyScene(_ nextScene: any RenderScene) {
@@ -318,7 +316,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     private func notifyCullingState(stats: CullingStats) {
-        let statusLines = [scene.hudStatus, rocketParticleEffect.debugStatus]
+        let statusLines = [scene.hudStatus, scene.particleStatus]
             .compactMap { $0 }
             .joined(separator: "\n")
         onCullingStateUpdate?(

@@ -6,6 +6,7 @@ import simd
 
 struct SceneGeometry {
     let objects: [CullingObject]
+    let rootTransform: simd_float4x4
 }
 
 struct LODGeometryLevel {
@@ -32,18 +33,42 @@ protocol RenderScene {
     var preferredCameraPitch: Float { get }
     var sceneBounds: AABB { get }
     var hudStatus: String? { get }
+    var particleStatus: String? { get }
 
     func makeFrameData(viewMatrix: simd_float4x4,
                        projectionMatrix: simd_float4x4,
                        cullingOptions: CullingOptions) -> SceneFrameData
+
+    func encodeParticles(commandBuffer: MTLCommandBuffer,
+                         drawableTexture: MTLTexture,
+                         depthTexture: MTLTexture,
+                         viewMatrix: simd_float4x4,
+                         projectionMatrix: simd_float4x4,
+                         time: Float,
+                         deltaTime: Float,
+                         throttle: Float,
+                         renderViewport: RenderViewport?)
 }
 
 extension RenderScene {
     var hudStatus: String? { nil }
+    var particleStatus: String? { nil }
+
+    func encodeParticles(commandBuffer: MTLCommandBuffer,
+                         drawableTexture: MTLTexture,
+                         depthTexture: MTLTexture,
+                         viewMatrix: simd_float4x4,
+                         projectionMatrix: simd_float4x4,
+                         time: Float,
+                         deltaTime: Float,
+                         throttle: Float,
+                         renderViewport: RenderViewport?) {
+    }
 }
 
 final class USDSceneImporter {
     private static let defaultSpecularStrength: Float = 0.0
+    private static let sponzaSceneScale: Float = 300.0
 
     private struct ImportedMeshObject {
         let name: String
@@ -65,19 +90,20 @@ final class USDSceneImporter {
             return nil
         }
 
-        let importedObjects = loadMeshObjects(
+        let importedScene = loadMeshObjects(
             from: sceneURL,
             vertexDescriptor: vertexDescriptor,
             regenerateNormals: false,
-            normalCreaseThreshold: 0.7
+            normalCreaseThreshold: 0.7,
+            sceneScale: Self.sponzaSceneScale
         )
-        let objects = makeCullingObjects(from: importedObjects, startID: 0, labelPrefix: "Sponza")
+        let objects = makeCullingObjects(from: importedScene.objects, startID: 0, labelPrefix: "Sponza")
         guard !objects.isEmpty else {
             print("[USDSceneImporter] Sponza asset found but no renderable geometry created")
             return nil
         }
 
-        return SceneGeometry(objects: objects)
+        return SceneGeometry(objects: objects, rootTransform: importedScene.rootTransform)
     }
 
     func loadLODModel(resourceName: String,
@@ -90,12 +116,13 @@ final class USDSceneImporter {
             return nil
         }
 
-        let importedObjects = loadMeshObjects(
+        let importedScene = loadMeshObjects(
             from: sceneURL,
             vertexDescriptor: vertexDescriptor,
             regenerateNormals: regenerateNormals,
             normalCreaseThreshold: normalCreaseThreshold
         )
+        let importedObjects = importedScene.objects
         guard !importedObjects.isEmpty else {
             print("[USDSceneImporter] LOD asset \(resourceName) found but no renderable geometry created")
             return nil
@@ -122,10 +149,16 @@ final class USDSceneImporter {
         return LODModelGeometry(levels: levels, bounds: bounds)
     }
 
+    private struct ImportedScene {
+        let objects: [ImportedMeshObject]
+        let rootTransform: simd_float4x4
+    }
+
     private func loadMeshObjects(from sceneURL: URL,
                                  vertexDescriptor: MTLVertexDescriptor,
                                  regenerateNormals: Bool,
-                                 normalCreaseThreshold: Float) -> [ImportedMeshObject] {
+                                 normalCreaseThreshold: Float,
+                                 sceneScale: Float = 1.0) -> ImportedScene {
         let allocator = MTKMeshBufferAllocator(device: device)
         let mdlVertexDescriptor = MTKModelIOVertexDescriptorFromMetal(vertexDescriptor)
         (mdlVertexDescriptor.attributes[0] as? MDLVertexAttribute)?.name = MDLVertexAttributePosition
@@ -138,7 +171,7 @@ final class USDSceneImporter {
         asset.loadTextures()
 
         var objects: [ImportedMeshObject] = []
-        let rootTransform = Self.upAxisTransform(for: asset.upAxis)
+        let rootTransform = Self.rootTransform(upAxis: asset.upAxis, sceneScale: sceneScale)
         for index in 0 ..< asset.count {
             appendMeshObjects(
                 from: asset.object(at: index),
@@ -152,7 +185,7 @@ final class USDSceneImporter {
             )
         }
 
-        return objects
+        return ImportedScene(objects: objects, rootTransform: rootTransform)
     }
 
     private func appendMeshObjects(from object: MDLObject,
@@ -281,6 +314,16 @@ final class USDSceneImporter {
         transform.columns.1 = simd_float4(0.0, 0.0, -1.0, 0.0)
         transform.columns.2 = simd_float4(0.0, 1.0, 0.0, 0.0)
         transform.columns.3 = simd_float4(0.0, 0.0, 0.0, 1.0)
+        return transform
+    }
+
+    private static func rootTransform(upAxis: simd_float3, sceneScale: Float) -> simd_float4x4 {
+        var transform = upAxisTransform(for: upAxis)
+        guard sceneScale != 1.0 else { return transform }
+
+        transform.columns.0 *= sceneScale
+        transform.columns.1 *= sceneScale
+        transform.columns.2 *= sceneScale
         return transform
     }
 

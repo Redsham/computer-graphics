@@ -188,6 +188,7 @@ final class RenderingSystem {
 
     var debugPreviewModeValue: DebugPreviewMode { debugPreviewMode }
     var sceneDepthTexture: MTLTexture { gbuffer.depth }
+    var geometryVertexDescriptorValue: MTLVertexDescriptor { vertexDescriptor }
 
     init(device: MTLDevice, view: MTKView) {
         self.device = device

@@ -31,6 +31,18 @@ struct ParticleSortKey {
     uint particleIndex;
 };
 
+struct ParticleCollisionUniforms {
+    float4x4 viewProjection;
+    float4x4 inverseViewProjection;
+    float4 uvTransform;
+    float4 params;
+    float4 planeCenter;
+    float4 planeNormal;
+    float4 planeTangent;
+    float4 planeBitangent;
+    float4 planeParams;
+};
+
 struct SortParams {
     uint stage;
     uint pass;
@@ -107,9 +119,117 @@ static inline void shadeParticle(thread Particle &particle, constant ParticleUni
     particle.color.a *= fadeIn * fadeOut * uniforms.fade.z;
 }
 
+static inline bool particleDepthHit(float3 worldPosition,
+                                    constant ParticleCollisionUniforms &collision,
+                                    depth2d<float, access::sample> sceneDepth) {
+    constexpr sampler nearestClamp(address::clamp_to_edge, filter::nearest);
+    float4 clipPosition = collision.viewProjection * float4(worldPosition, 1.0);
+    if (clipPosition.w <= 0.0001) {
+        return false;
+    }
+
+    float3 ndc = clipPosition.xyz / clipPosition.w;
+    if (ndc.z < 0.0 || ndc.z > 1.0) {
+        return false;
+    }
+
+    float2 baseUV = float2(ndc.x * 0.5 + 0.5, 1.0 - (ndc.y * 0.5 + 0.5));
+    if (!all(baseUV >= float2(0.0)) || !all(baseUV <= float2(1.0))) {
+        return false;
+    }
+
+    float2 depthUV = clamp(baseUV * collision.uvTransform.xy + collision.uvTransform.zw, 0.0, 1.0);
+    float surfaceDepth = sceneDepth.sample(nearestClamp, depthUV);
+    if (surfaceDepth >= 0.999) {
+        return false;
+    }
+
+    return ndc.z > surfaceDepth + collision.params.x;
+}
+
+static inline float3 reconstructDepthWorld(float2 baseUV,
+                                           float depth,
+                                           constant ParticleCollisionUniforms &collision) {
+    float2 ndcXY = float2(baseUV.x * 2.0 - 1.0, (1.0 - baseUV.y) * 2.0 - 1.0);
+    float4 world = collision.inverseViewProjection * float4(ndcXY, depth, 1.0);
+    return world.xyz / max(abs(world.w), 0.0001);
+}
+
+static inline float3 depthSurfaceNormal(float3 worldPosition,
+                                        float3 velocity,
+                                        constant ParticleCollisionUniforms &collision,
+                                        depth2d<float, access::sample> sceneDepth) {
+    constexpr sampler nearestClamp(address::clamp_to_edge, filter::nearest);
+    float4 clipPosition = collision.viewProjection * float4(worldPosition, 1.0);
+    float3 ndc = clipPosition.xyz / max(clipPosition.w, 0.0001);
+    float2 baseUV = clamp(float2(ndc.x * 0.5 + 0.5, 1.0 - (ndc.y * 0.5 + 0.5)), 0.0, 1.0);
+    float2 texel = 1.0 / float2(max(sceneDepth.get_width(), 1u), max(sceneDepth.get_height(), 1u));
+
+    float2 centerDepthUV = clamp(baseUV * collision.uvTransform.xy + collision.uvTransform.zw, 0.0, 1.0);
+    float centerDepth = sceneDepth.sample(nearestClamp, centerDepthUV);
+    float rightDepth = sceneDepth.sample(nearestClamp, clamp(centerDepthUV + float2(texel.x, 0.0), 0.0, 1.0));
+    float upDepth = sceneDepth.sample(nearestClamp, clamp(centerDepthUV + float2(0.0, -texel.y), 0.0, 1.0));
+
+    float2 rightBaseUV = clamp(baseUV + float2(texel.x / max(collision.uvTransform.x, 0.0001), 0.0), 0.0, 1.0);
+    float2 upBaseUV = clamp(baseUV + float2(0.0, -texel.y / max(collision.uvTransform.y, 0.0001)), 0.0, 1.0);
+
+    float3 center = reconstructDepthWorld(baseUV, centerDepth, collision);
+    float3 right = reconstructDepthWorld(rightBaseUV, rightDepth, collision);
+    float3 up = reconstructDepthWorld(upBaseUV, upDepth, collision);
+    float3 normal = normalize(cross(right - center, up - center));
+    if (!all(isfinite(normal)) || dot(normal, normal) < 0.25) {
+        normal = -normalize(velocity);
+    }
+    if (dot(normal, velocity) > 0.0) {
+        normal = -normal;
+    }
+    return normal;
+}
+
+static inline bool particlePlaneHit(float3 previousPosition,
+                                    float3 currentPosition,
+                                    float particleRadius,
+                                    constant ParticleCollisionUniforms &collision,
+                                    thread float3 &surfaceNormal) {
+    if (collision.planeParams.w < 0.5) {
+        return false;
+    }
+
+    float3 center = collision.planeCenter.xyz;
+    float3 normal = normalize(collision.planeNormal.xyz);
+    float3 tangent = normalize(collision.planeTangent.xyz);
+    float3 bitangent = normalize(collision.planeBitangent.xyz);
+    float previousDistance = dot(previousPosition - center, normal);
+    float currentDistance = dot(currentPosition - center, normal);
+    float radius = max(particleRadius * 0.45, 0.35);
+    bool crossedPlane = (previousDistance <= radius && currentDistance >= -radius)
+        || (previousDistance >= -radius && currentDistance <= radius);
+    if (!crossedPlane) {
+        return false;
+    }
+
+    float denominator = previousDistance - currentDistance;
+    float t = abs(denominator) > 0.0001 ? clamp(previousDistance / denominator, 0.0, 1.0) : 1.0;
+    float3 hitPosition = mix(previousPosition, currentPosition, t);
+    float3 local = hitPosition - center;
+    bool insideSurface = abs(dot(local, tangent)) <= collision.planeParams.x
+        && abs(dot(local, bitangent)) <= collision.planeParams.y;
+    if (!insideSurface) {
+        return false;
+    }
+
+    surfaceNormal = normal;
+    if (dot(surfaceNormal, currentPosition - previousPosition) > 0.0) {
+        surfaceNormal = -surfaceNormal;
+    }
+    return true;
+}
+
 kernel void updateParticlePool(device Particle *particles [[buffer(0)]],
                                device atomic_uint *liveCounter [[buffer(1)]],
                                constant ParticleUniforms &uniforms [[buffer(2)]],
+                               constant ParticleCollisionUniforms &collision [[buffer(3)]],
+                               depth2d<float, access::sample> sceneDepth [[texture(0)]],
                                uint id [[thread_position_in_grid]]) {
     uint maxParticleCount = (uint)uniforms.timing.w;
     if (id >= maxParticleCount) {
@@ -144,6 +264,7 @@ kernel void updateParticlePool(device Particle *particles [[buffer(0)]],
     float noiseA = sin(time * 11.0 + seed * 37.0 + normalizedAge * 4.0);
     float noiseB = cos(time * 8.0 + seed * 23.0 - normalizedAge * 5.0);
     float3 sideNoise = emitterRight * noiseA + emitterUp * noiseB;
+    float3 previousPosition = particle.positionSeed.xyz;
 
     particle.velocityDrag.xyz += sideNoise * uniforms.behavior.y * dt * (0.18 + normalizedAge * 0.82);
     particle.velocityDrag.xyz += exhaustDir * uniforms.behavior.z * dt * (0.5 + throttle * 0.7);
@@ -152,8 +273,45 @@ kernel void updateParticlePool(device Particle *particles [[buffer(0)]],
     particle.ageLifeSizeRandom.x += dt;
     particle.ageLifeSizeRandom.z *= 1.0 + uniforms.behavior.x * dt;
 
+    bool collided = false;
+    if (collision.params.w > 0.5) {
+        float3 currentPosition = particle.positionSeed.xyz;
+        float3 midPosition = mix(previousPosition, currentPosition, 0.5);
+        float3 analyticNormal = float3(0.0, 1.0, 0.0);
+        bool analyticHit = particlePlaneHit(
+            previousPosition,
+            currentPosition,
+            particle.ageLifeSizeRandom.z,
+            collision,
+            analyticNormal
+        );
+        bool currentHit = particleDepthHit(currentPosition, collision, sceneDepth);
+        bool midHit = particleDepthHit(midPosition, collision, sceneDepth);
+
+        if (analyticHit || currentHit || midHit) {
+            collided = true;
+            float3 surfaceNormal = analyticHit
+                ? analyticNormal
+                : depthSurfaceNormal(
+                    currentHit ? currentPosition : midPosition,
+                    particle.velocityDrag.xyz,
+                    collision,
+                    sceneDepth
+                );
+            float3 velocity = particle.velocityDrag.xyz;
+            float normalSpeed = dot(velocity, surfaceNormal);
+            float3 tangentVelocity = velocity - surfaceNormal * normalSpeed;
+            particle.positionSeed.xyz = previousPosition + surfaceNormal * max(particle.ageLifeSizeRandom.z * 0.55, 0.75);
+            particle.velocityDrag.xyz = tangentVelocity * 0.55 + reflect(velocity, surfaceNormal) * collision.params.y;
+            particle.ageLifeSizeRandom.x = min(
+                particle.ageLifeSizeRandom.y,
+                particle.ageLifeSizeRandom.x + dt * collision.params.z
+            );
+        }
+    }
+
     shadeParticle(particle, uniforms);
-    if (particle.ageLifeSizeRandom.x >= particle.ageLifeSizeRandom.y || particle.color.a <= 0.001) {
+    if (!collided && (particle.ageLifeSizeRandom.x >= particle.ageLifeSizeRandom.y || particle.color.a <= 0.001)) {
         particle = makeParticle(id, uniforms, time + seed, false);
         shadeParticle(particle, uniforms);
     }

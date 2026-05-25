@@ -20,14 +20,13 @@ final class RocketEngineScene: RenderScene {
         """
         Scene : Rocket engine
         Input : slider / +/- thrust
-        GPU   : compute particles
         """
     }
 
     init(device: MTLDevice) {
         let nozzle = GeometryPrimitives.makeConeDrawCall(
             device: device,
-            radius: 34.0,
+            radius: 15.0,
             height: 76.0,
             color: simd_float4(0.10, 0.11, 0.13, 1.0)
         )
@@ -35,7 +34,7 @@ final class RocketEngineScene: RenderScene {
         var drawCalls: [GeometryDrawCall] = []
         drawCalls.append(Self.transformed(nozzle) { model in
             translateMatrix(matrix: &model, position: simd_float3(0.0, -16.0, 0.0))
-            rotateMatrix(matrix: &model, rotation: simd_float3(.pi, 0.0, 0.0))
+            rotateMatrix(matrix: &model, rotation: simd_float3(0.0, 0.0, 0.0))
         })
 
         let bounds = AABB(
@@ -46,7 +45,7 @@ final class RocketEngineScene: RenderScene {
             id: 0,
             bounds: bounds,
             drawCalls: drawCalls,
-            label: "Rocket nozzle"
+            label: "Nozzle"
         )
         self.objects = [object]
         self.sceneBounds = bounds
