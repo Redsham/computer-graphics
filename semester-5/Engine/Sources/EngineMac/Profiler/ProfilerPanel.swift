@@ -11,6 +11,13 @@ import SwiftUI
         state.frozen ?? session.profileFrames
     }
 
+    private var frameDomain: ClosedRange<UInt64> {
+        let span = UInt64(max(2, session.renderer.profiles.capacity) - 1)
+        let end = max(frames.last?.id ?? 0, span)
+
+        return (end - span)...end
+    }
+
     private var latest: FrameProfile? {
         frames.first(where: {
             $0.id == state.selectedFrameID
@@ -59,6 +66,7 @@ import SwiftUI
                             .foregroundStyle(by: .value("Stage", "GPU"))
                     }
                 }
+                .chartXScale(domain: frameDomain)
                 .chartXSelection(value: $state.selectedFrameID)
                 .chartYAxisLabel("ms")
                 .chartLegend(position: .bottom)
