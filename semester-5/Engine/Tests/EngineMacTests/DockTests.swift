@@ -173,6 +173,23 @@ final class DockTests: XCTestCase {
         let toolbarHeight = host.bounds.height - workspace.view.bounds.height
         XCTAssertLessThan(toolbarHeight, 60)
 
+        func assertSizesSurviveUpdates(_ panes: [NSView], file: StaticString = #filePath, line: UInt = #line)
+        {
+            let sizes = panes.map(\.frame.size)
+
+            for _ in 0..<3 {
+                session.refreshDiagnostics()
+                workspace.updateLayout()
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+
+                for (pane, size) in zip(panes, sizes) {
+                    XCTAssertEqual(pane.frame.width, size.width, accuracy: 1, file: file, line: line)
+                    XCTAssertEqual(pane.frame.height, size.height, accuracy: 1, file: file, line: line)
+                }
+            }
+        }
+
         func consoleTab(in view: NSView) -> DockTabButton? {
             if let tab = view as? DockTabButton, tab.panel == .console {
                 return tab
@@ -201,12 +218,20 @@ final class DockTests: XCTestCase {
                     bottom.bounds.maxY - tabFrame.maxY, tabInset, accuracy: 1,
                     "The dock tab strip must not stretch when the bottom panel grows")
                 bottomHeights.append(bottom.bounds.height)
+                assertSizesSurviveUpdates([bottom])
             }
 
             XCTAssertGreaterThan(
                 (bottomHeights.max() ?? 0) - (bottomHeights.min() ?? 0), 50,
                 "The bottom dock must actually resize when its divider moves")
         }
+
+        workspace.splitView.setPosition(workspace.splitView.bounds.height, ofDividerAt: 0)
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+        XCTAssertFalse(try XCTUnwrap(workspace.splitViewItems.last).isCollapsed)
+        XCTAssertEqual(bottom.frame.height, 220, accuracy: 1)
+        assertSizesSurviveUpdates([bottom])
 
         let dock = try XCTUnwrap(session.diagnosticsDock)
         dock.dock(.profiler, in: .left)
@@ -222,12 +247,35 @@ final class DockTests: XCTestCase {
                 host.layoutSubtreeIfNeeded()
                 RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
                 widths.append(item.viewController.view.bounds.width)
+                assertSizesSurviveUpdates(horizontal.splitViewItems.map { $0.viewController.view })
             }
 
             XCTAssertGreaterThan(
                 (widths.max() ?? 0) - (widths.min() ?? 0), 50,
                 "Both side docks must actually resize when their dividers move")
+
+            horizontal.splitView.setPosition(
+                divider == 0 ? 0 : horizontal.splitView.bounds.width, ofDividerAt: divider)
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+            XCTAssertFalse(item.isCollapsed)
+            XCTAssertEqual(item.viewController.view.frame.width, 280, accuracy: 1)
+            assertSizesSurviveUpdates(horizontal.splitViewItems.map { $0.viewController.view })
         }
+
+        dock.toggleDiagnostics()
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+        XCTAssertTrue(try XCTUnwrap(workspace.splitViewItems.last).isCollapsed)
+        XCTAssertTrue(horizontal.splitViewItems[0].isCollapsed)
+        XCTAssertFalse(horizontal.splitViewItems[2].isCollapsed)
+
+        dock.toggleDiagnostics()
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+        XCTAssertFalse(try XCTUnwrap(workspace.splitViewItems.last).isCollapsed)
+        XCTAssertFalse(horizontal.splitViewItems[0].isCollapsed)
+        assertSizesSurviveUpdates([bottom] + horizontal.splitViewItems.map { $0.viewController.view })
     }
 
     func testFloatingWindowRetainsContentAndOutgoingMountCannotStealIt() throws {

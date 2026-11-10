@@ -70,7 +70,10 @@ import SwiftUI
         container.mount(content)
         controller.view = container
         let item = NSSplitViewItem(viewController: controller)
-        item.canCollapse = true
+        // Visibility belongs to the dock model. Native drag-to-collapse would be undone by its next update.
+        item.canCollapse = false
+        item.canCollapseFromWindowResize = false
+        item.collapseBehavior = .preferResizingSiblingsWithFixedSplitView
         item.minimumThickness = minimum
         item.maximumThickness = maximum
         // Preserve tool sizes during window resizing without blocking divider dragging (priority 490).
@@ -109,7 +112,12 @@ import SwiftUI
             let visible = panels.contains {
                 !dock.layout.diagnosticsHidden || $0 == .settings
             }
-            items[region]?.isCollapsed = !visible
+
+            let collapsed = !visible
+
+            if let item = items[region], item.isCollapsed != collapsed {
+                item.isCollapsed = collapsed
+            }
         }
 
         updateDropTargets()
