@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Panel identity and placement
 
 enum DockPanel: String, CaseIterable, Codable, Identifiable {
-    case console, log, profiler, frame, settings
+    case console, profiler, frame, settings
 
     var id: String {
         rawValue
@@ -13,8 +13,6 @@ enum DockPanel: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .console:
             "Console"
-        case .log:
-            "Log"
         case .profiler:
             "Profiler"
         case .frame:
@@ -28,8 +26,6 @@ enum DockPanel: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .console:
             "terminal"
-        case .log:
-            "list.bullet.rectangle"
         case .profiler:
             "chart.xyaxis.line"
         case .frame:
@@ -71,7 +67,7 @@ struct DockLayout: Codable, Equatable {
     static let initial = DockLayout(groups: [
         .left: DockGroup(),
         .right: DockGroup(panels: [.settings], selected: .settings),
-        .bottom: DockGroup(panels: [.console, .log, .profiler, .frame], selected: .console),
+        .bottom: DockGroup(panels: [.console, .profiler, .frame], selected: .console),
     ])
 
     func region(of panel: DockPanel) -> DockRegion? {
@@ -151,5 +147,72 @@ struct DockLayout: Codable, Equatable {
         }
 
         return self
+    }
+}
+
+// MARK: - Compatibility with separate Console and Log panels
+
+extension DockLayout {
+    private enum CodingKeys: String, CodingKey {
+        case groups, floating, diagnosticsHidden
+    }
+
+    private enum SavedPanel: String, Codable {
+        case console, log, profiler, frame, settings
+    }
+
+    private struct SavedGroup: Decodable {
+        let panels: [SavedPanel]
+        let selected: SavedPanel?
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let savedGroups = try container.decode([DockRegion: SavedGroup].self, forKey: .groups)
+        let savedWindows = try container.decode([SavedPanel: DockWindowFrame].self, forKey: .floating)
+        diagnosticsHidden = try container.decode(Bool.self, forKey: .diagnosticsHidden)
+        var seen: Set<SavedPanel> = []
+
+        // Validate before merging, so migration cannot conceal corrupted ownership or selection.
+        for group in savedGroups.values {
+            guard group.selected.map(group.panels.contains) ?? group.panels.isEmpty else {
+                throw CocoaError(.coderReadCorrupt)
+            }
+
+            for panel in group.panels {
+                guard seen.insert(panel).inserted else {
+                    throw CocoaError(.coderReadCorrupt)
+                }
+            }
+        }
+
+        for (panel, frame) in savedWindows {
+            guard seen.insert(panel).inserted, frame.isValid else {
+                throw CocoaError(.coderReadCorrupt)
+            }
+        }
+
+        // Prefer Console's placement. If it was hidden, reuse Log's dock or floating window.
+        let hasConsole = seen.contains(.console)
+
+        func merged(_ panel: SavedPanel) -> DockPanel? {
+            if panel == .log {
+                return hasConsole ? nil : .console
+            }
+
+            return DockPanel(rawValue: panel.rawValue)
+        }
+
+        groups = savedGroups.mapValues { group in
+            let panels = group.panels.compactMap(merged)
+            let selected =
+                group.selected == .log && panels.contains(.console)
+                ? .console : group.selected.flatMap(merged)
+            return DockGroup(panels: panels, selected: selected ?? panels.first)
+        }
+        floating = Dictionary(
+            uniqueKeysWithValues: savedWindows.compactMap { panel, frame in
+                merged(panel).map { ($0, frame) }
+            })
     }
 }

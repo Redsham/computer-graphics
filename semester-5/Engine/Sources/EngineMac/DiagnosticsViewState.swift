@@ -6,7 +6,6 @@ import SwiftUI
 
 @MainActor final class DiagnosticsViewState {
     let console = ConsoleViewState()
-    let log = LogViewState()
     let profiler = ProfilerViewState()
     let frame = FrameDebuggerViewState()
 }
@@ -15,9 +14,7 @@ import SwiftUI
     @Published var input = ""
     @Published var historyIndex: Int?
     @Published var suggestions = ""
-}
 
-@MainActor final class LogViewState: ObservableObject {
     @Published var search = ""
     @Published var minimum = LogLevel.debug
     @Published var follow = true

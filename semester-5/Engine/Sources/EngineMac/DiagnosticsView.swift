@@ -84,7 +84,16 @@ import SwiftUI
 
     var body: some View {
         VStack(spacing: 0) {
-            LogRows(entries: session.logEntries, follow: true)
+            logControls
+
+            Divider()
+
+            LogRows(
+                entries: (state.frozen ?? session.logEntries).filter {
+                    $0.level.rank >= state.minimum.rank
+                        && (state.search.isEmpty
+                            || "\($0.category) \($0.message)".localizedCaseInsensitiveContains(state.search))
+                }, follow: state.follow)
 
             Divider()
 
@@ -153,46 +162,49 @@ import SwiftUI
             .padding(12)
         }
     }
-}
 
-// MARK: - Log viewer
+    // MARK: - Journal controls
 
-@MainActor struct LogPanel: View {
-    @ObservedObject var session: EngineSession
-
-    @ObservedObject var state: LogViewState
-
-    var body: some View {
-        VStack(spacing: 0) {
+    private var logControls: some View {
+        VStack(spacing: 8) {
             HStack {
                 TextField("Search category or message", text: $state.search)
                     .textFieldStyle(.roundedBorder)
 
                 Picker("Minimum", selection: $state.minimum) {
-                    ForEach(LogLevel.allCases, id: \.self) {
-                        Text($0.rawValue)
-                            .tag($0)
+                    ForEach(LogLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue)
+                            .tag(level)
                     }
                 }
                 .frame(width: 180)
+            }
 
+            HStack {
                 Toggle("Follow", isOn: $state.follow)
 
                 Button(state.frozen == nil ? "Freeze display" : "Live display") {
                     state.frozen = state.frozen == nil ? session.logEntries : nil
                 }
-            }
-            .padding(8)
 
-            LogRows(
-                entries: (state.frozen ?? session.logEntries).filter {
-                    $0.level.rank >= state.minimum.rank
-                        && (state.search.isEmpty
-                            || "\($0.category) \($0.message)".localizedCaseInsensitiveContains(state.search))
-                }, follow: state.follow)
+                Spacer()
+
+                Button("Export log…") {
+                    session.exportLog()
+                }
+
+                Button("Clear log") {
+                    session.log.clear()
+                    state.frozen = nil
+                    session.refreshDiagnostics()
+                }
+            }
         }
+        .padding(8)
     }
 }
+
+// MARK: - Log viewer
 
 @MainActor private struct LogRows: View {
     let entries: [LogEntry]

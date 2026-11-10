@@ -23,8 +23,6 @@ import SwiftUI
             0
         case .console:
             500
-        case .log:
-            650
         case .profiler, .frame:
             960
         }
@@ -34,8 +32,6 @@ import SwiftUI
         switch panel {
         case .console:
             ConsolePanel(session: session, state: state.console)
-        case .log:
-            LogPanel(session: session, state: state.log)
         case .profiler:
             ProfilerPanel(session: session, state: state.profiler)
         case .frame:

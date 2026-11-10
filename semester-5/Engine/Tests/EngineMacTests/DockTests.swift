@@ -13,7 +13,7 @@ final class DockTests: XCTestCase {
         XCTAssertEqual(layout.groups[.left]?.panels, [.profiler])
         XCTAssertFalse(layout.groups[.bottom]?.panels.contains(.profiler) ?? true)
         layout.dock(.frame, in: .bottom, before: .console)
-        XCTAssertEqual(layout.groups[.bottom]?.panels, [.frame, .console, .log])
+        XCTAssertEqual(layout.groups[.bottom]?.panels, [.frame, .console])
         XCTAssertEqual(layout.groups[.bottom]?.selected, .frame)
         layout.dock(.frame, in: .bottom, before: .frame)
         XCTAssertEqual(try layout.validated(), layout)
@@ -24,7 +24,7 @@ final class DockTests: XCTestCase {
         layout.detach(.console, frame: windowFrame)
         XCTAssertNil(layout.region(of: .console))
         XCTAssertEqual(layout.floating[.console], windowFrame)
-        XCTAssertEqual(layout.groups[.bottom]?.selected, .log)
+        XCTAssertEqual(layout.groups[.bottom]?.selected, .profiler)
         layout.dock(.console, in: .right)
         XCTAssertNil(layout.floating[.console])
         XCTAssertEqual(layout.groups[.right]?.selected, .console)
@@ -38,7 +38,7 @@ final class DockTests: XCTestCase {
         var layout = DockLayout.initial
         layout.detach(.frame, frame: windowFrame)
         layout.dock(.profiler, in: .left)
-        layout.remove(.log)
+        layout.remove(.console)
         layout.diagnosticsHidden = true
         let data = try JSONEncoder().encode(layout)
         let restored = try JSONDecoder().decode(DockLayout.self, from: data).validated()
@@ -72,6 +72,63 @@ final class DockTests: XCTestCase {
         XCTAssertTrue(layout.isVisible(.settings))
         XCTAssertFalse(layout.isVisible(.console))
     }
+
+    func testLegacyConsoleAndLogTabsMergeWithoutResettingLayout() throws {
+        let data = Data(
+            #"""
+            {
+                "groups": [
+                    "left", {"panels": ["profiler"], "selected": "profiler"},
+                    "bottom", {"panels": ["console", "log", "frame"], "selected": "log"}
+                ],
+                "floating": [],
+                "diagnosticsHidden": false
+            }
+            """#.utf8)
+        let layout = try JSONDecoder().decode(DockLayout.self, from: data).validated()
+
+        XCTAssertEqual(layout.groups[.bottom]?.panels, [.console, .frame])
+        XCTAssertEqual(layout.groups[.bottom]?.selected, .console)
+        XCTAssertEqual(layout.groups[.left]?.panels, [.profiler])
+        XCTAssertEqual(DockPanel.allCases.count, 4)
+        XCTAssertFalse(String(decoding: try JSONEncoder().encode(layout), as: UTF8.self).contains("\"log\""))
+    }
+
+    func testLegacyLogOnlyWindowBecomesConsoleWindow() throws {
+        let data = Data(
+            #"""
+            {
+                "groups": [
+                    "bottom", {"panels": ["profiler", "frame"], "selected": "frame"}
+                ],
+                "floating": ["log", {"x": 100, "y": 100, "width": 900, "height": 480}],
+                "diagnosticsHidden": false
+            }
+            """#.utf8)
+        let layout = try JSONDecoder().decode(DockLayout.self, from: data).validated()
+
+        XCTAssertEqual(layout.floating[.console], windowFrame)
+        XCTAssertNil(layout.region(of: .console))
+        XCTAssertEqual(layout.groups[.bottom]?.selected, .frame)
+    }
+
+    func testLegacyConsolePlacementWinsOverSeparateLogWindow() throws {
+        let data = Data(
+            #"""
+            {
+                "groups": [
+                    "right", {"panels": ["console", "settings"], "selected": "console"}
+                ],
+                "floating": ["log", {"x": 100, "y": 100, "width": 900, "height": 480}],
+                "diagnosticsHidden": true
+            }
+            """#.utf8)
+        let layout = try JSONDecoder().decode(DockLayout.self, from: data).validated()
+
+        XCTAssertEqual(layout.groups[.right]?.panels, [.console, .settings])
+        XCTAssertTrue(layout.floating.isEmpty)
+        XCTAssertTrue(layout.diagnosticsHidden)
+    }
 }
 
 @MainActor final class DockWindowTests: XCTestCase {
@@ -102,7 +159,7 @@ final class DockTests: XCTestCase {
 
         let original = dock.content(for: .console)
         dock.viewState.console.input = "echo preserved draft"
-        dock.viewState.log.search = "Metal"
+        dock.viewState.console.search = "Metal"
         dock.viewState.profiler.selectedFrameID = 42
         let outgoing = PanelContainer(frame: NSRect(x: 0, y: 0, width: 600, height: 300))
         XCTAssertTrue(dock.mount(.console, in: outgoing, region: .bottom))
@@ -119,7 +176,7 @@ final class DockTests: XCTestCase {
         XCTAssertTrue(original.superview === incoming)
         XCTAssertNil(dock.windows[.console])
         XCTAssertEqual(dock.viewState.console.input, "echo preserved draft")
-        XCTAssertEqual(dock.viewState.log.search, "Metal")
+        XCTAssertEqual(dock.viewState.console.search, "Metal")
         XCTAssertEqual(dock.viewState.profiler.selectedFrameID, 42)
 
         // The native close button must return a floating tool without closing the engine session.
