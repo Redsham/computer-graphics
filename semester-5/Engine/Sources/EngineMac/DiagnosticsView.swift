@@ -211,41 +211,45 @@ import SwiftUI
     let follow: Bool
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView([.vertical, .horizontal]) {
-                LazyVStack(alignment: .leading, spacing: 3) {
-                    ForEach(entries) { entry in
-                        HStack(alignment: .top, spacing: 10) {
-                            Text(
-                                entry.timestamp,
-                                format: .dateTime.hour().minute().second().secondFraction(.fractional(3))
-                            )
-                            .foregroundStyle(.secondary)
-
-                            Text(entry.level.rawValue.uppercased())
-                                .frame(width: 64, alignment: .leading)
-                                .foregroundStyle(color(entry.level))
-
-                            Text("[\(entry.category)]")
+        GeometryReader { viewport in
+            ScrollViewReader { proxy in
+                ScrollView([.vertical, .horizontal]) {
+                    LazyVStack(alignment: .leading, spacing: 3) {
+                        ForEach(entries) { entry in
+                            HStack(alignment: .top, spacing: 10) {
+                                Text(
+                                    entry.timestamp,
+                                    format: .dateTime.hour().minute().second().secondFraction(.fractional(3))
+                                )
                                 .foregroundStyle(.secondary)
 
-                            Text(entry.message)
-                                .foregroundStyle(color(entry.level))
-                                .textSelection(.enabled)
-                        }
-                        .font(.system(size: 11, design: .monospaced))
-                        .id(entry.id)
-                    }
+                                Text(entry.level.rawValue.uppercased())
+                                    .frame(width: 64, alignment: .leading)
+                                    .foregroundStyle(color(entry.level))
 
-                    Color.clear.frame(height: 1)
-                        .id("end")
+                                Text("[\(entry.category)]")
+                                    .foregroundStyle(.secondary)
+
+                                Text(entry.message)
+                                    .foregroundStyle(color(entry.level))
+                                    .textSelection(.enabled)
+                            }
+                            .font(.system(size: 11, design: .monospaced))
+                            .fixedSize(horizontal: true, vertical: false)
+                            .id(entry.id)
+                        }
+
+                        Color.clear.frame(height: 1)
+                            .id("end")
+                    }
+                    .frame(minWidth: max(0, viewport.size.width - 20), alignment: .leading)
+                    .padding(10)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
-            }
-            .onChange(of: entries.last?.id) {
-                if follow {
-                    proxy.scrollTo("end", anchor: .bottom)
+                .defaultScrollAnchor(.topLeading)
+                .onChange(of: entries.last?.id) {
+                    if follow {
+                        proxy.scrollTo("end", anchor: .bottomLeading)
+                    }
                 }
             }
         }
