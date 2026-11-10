@@ -16,8 +16,8 @@ struct Gl_Globals {
 };
 
 struct IShader {
-    virtual         ~IShader() = default;
-    
+    virtual ~IShader() = default;
+
     static TGAColor sample2D(const TGAImage &img, const vec2 &uvf) {
         return img.get(uvf[0] * img.width(), uvf[1] * img.height());
     }

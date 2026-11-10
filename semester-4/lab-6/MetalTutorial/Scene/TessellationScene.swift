@@ -45,22 +45,23 @@ final class TessellationScene: RenderScene {
             minDistance: settings.minDistance,
             maxDistance: settings.maxDistance
         )
-        self.drawCall = .tessellated(TessellatedGeometryDrawCall(
-            controlPointBuffer: terrain.controlPointBuffer,
-            patchInfoBuffer: terrain.patchInfoBuffer,
-            tessellationFactorBuffer: terrain.tessellationFactorBuffer,
-            patchCount: terrain.patchCount,
-            modelMatrix: matrix_identity_float4x4,
-            displacementScale: settings.displacementScale,
-            uvScale: settings.uvScale,
-            normalStrength: settings.normalStrength,
-            material: MaterialDrawState(
-                albedoTexture: textures.albedo,
-                normalTexture: textures.normal,
-                displacementTexture: textures.displacement,
-                specularStrength: 0.0
-            )
-        ))
+        self.drawCall = .tessellated(
+            TessellatedGeometryDrawCall(
+                controlPointBuffer: terrain.controlPointBuffer,
+                patchInfoBuffer: terrain.patchInfoBuffer,
+                tessellationFactorBuffer: terrain.tessellationFactorBuffer,
+                patchCount: terrain.patchCount,
+                modelMatrix: matrix_identity_float4x4,
+                displacementScale: settings.displacementScale,
+                uvScale: settings.uvScale,
+                normalStrength: settings.normalStrength,
+                material: MaterialDrawState(
+                    albedoTexture: textures.albedo,
+                    normalTexture: textures.normal,
+                    displacementTexture: textures.displacement,
+                    specularStrength: 0.0
+                )
+            ))
         self.ambientLight = MtlAmbientLight(color: simd_float3(1.0, 0.98, 0.95), intensity: 0.5)
         self.directionalLight = MtlDirectionalLight(
             direction: simd_normalize(simd_float3(-0.35, -1.0, -0.1)),

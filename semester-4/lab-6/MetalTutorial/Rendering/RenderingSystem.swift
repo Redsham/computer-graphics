@@ -99,7 +99,10 @@ struct MtlSpotLight {
     var colorIntensity: simd_float4
     var params: simd_float4
 
-    init(position: simd_float3, direction: simd_float3, color: simd_float3, intensity: Float, innerCos: Float, outerCos: Float, radius: Float) {
+    init(
+        position: simd_float3, direction: simd_float3, color: simd_float3, intensity: Float, innerCos: Float,
+        outerCos: Float, radius: Float
+    ) {
         self.positionRadius = simd_float4(position, radius)
         self.directionInnerCos = simd_float4(direction, innerCos)
         self.colorIntensity = simd_float4(color, intensity)
@@ -159,36 +162,49 @@ final class RenderingSystem {
         )
 
         // Create pass-specific pipeline states.
-        self.indexedGeometryPSO = RenderingSystem.buildIndexedGeometryPSO(device: device, library: library, vertexDescriptor: vertexDescriptor)
-        self.tessellationGeometryPSO = RenderingSystem.buildTessellationGeometryPSO(device: device, library: library)
+        self.indexedGeometryPSO = RenderingSystem.buildIndexedGeometryPSO(
+            device: device, library: library, vertexDescriptor: vertexDescriptor)
+        self.tessellationGeometryPSO = RenderingSystem.buildTessellationGeometryPSO(
+            device: device, library: library)
         self.lightingPSO = RenderingSystem.buildLightingPSO(device: device, library: library, view: view)
-        self.tessellationFactorCSO = RenderingSystem.buildTessellationFactorCSO(device: device, library: library)
+        self.tessellationFactorCSO = RenderingSystem.buildTessellationFactorCSO(
+            device: device, library: library)
         // Depth settings differ by pass: geometry writes depth, lighting ignores it.
         self.depthStateGeometry = RenderingSystem.buildDepthState(device: device, compare: .less, write: true)
-        self.depthStateLighting = RenderingSystem.buildDepthState(device: device, compare: .always, write: false)
+        self.depthStateLighting = RenderingSystem.buildDepthState(
+            device: device, compare: .always, write: false)
     }
 
-    func resize(viewSize: CGSize) { gbuffer.resize(to: viewSize) }
+    func resize(viewSize: CGSize) {
+        gbuffer.resize(to: viewSize)
+    }
 
     func setDebugPreviewMode(_ mode: DebugPreviewMode) {
         debugPreviewMode = mode
     }
 
-    func encodeGeometryPass(commandBuffer: MTLCommandBuffer,
-                            drawCalls: [GeometryDrawCall],
-                            rendererKind: GeometryRendererKind,
-                            cameraPosition: simd_float3,
-                            viewMatrix: simd_float4x4,
-                            projectionMatrix: simd_float4x4) {
+    func encodeGeometryPass(
+        commandBuffer: MTLCommandBuffer,
+        drawCalls: [GeometryDrawCall],
+        rendererKind: GeometryRendererKind,
+        cameraPosition: simd_float3,
+        viewMatrix: simd_float4x4,
+        projectionMatrix: simd_float4x4
+    ) {
         if rendererKind == .tessellatedTerrain {
-            encodeTessellationFactorPass(commandBuffer: commandBuffer,
-                                         drawCalls: drawCalls,
-                                         cameraPosition: cameraPosition)
+            encodeTessellationFactorPass(
+                commandBuffer: commandBuffer,
+                drawCalls: drawCalls,
+                cameraPosition: cameraPosition)
         }
 
         // Pass 1 (deferred): rasterize scene into G-Buffer targets.
         let descriptor = gbuffer.makeGeometryPassDescriptor(clearColor: MTLClearColorMake(0, 0, 0, 1))
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
+
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return
+        }
+
         encoder.label = "GeometryPass"
         encoder.setDepthStencilState(depthStateGeometry)
 
@@ -197,6 +213,7 @@ final class RenderingSystem {
             encoder.setRenderPipelineState(indexedGeometryPSO)
             encoder.setCullMode(.back)
             encoder.setFrontFacing(.counterClockwise)
+
             if debugPreviewMode == .wireframe {
                 encoder.setTriangleFillMode(.lines)
             }
@@ -209,34 +226,42 @@ final class RenderingSystem {
             encoder.setVertexBytes(&camera, length: MemoryLayout<simd_float3>.stride, index: 4)
 
             for drawCall in drawCalls {
-                guard case let .indexed(indexedDrawCall) = drawCall else { continue }
+                guard case let .indexed(indexedDrawCall) = drawCall else {
+                    continue
+                }
+
                 encodeIndexedGeometry(drawCall: indexedDrawCall, encoder: encoder)
             }
 
         case .tessellatedTerrain:
             encoder.setCullMode(.back)
             encoder.setFrontFacing(.clockwise)
+
             if debugPreviewMode == .wireframe {
                 encoder.setTriangleFillMode(.lines)
             }
-            encodeTessellatedGeometry(encoder: encoder,
-                                      drawCalls: drawCalls,
-                                      viewMatrix: viewMatrix,
-                                      projectionMatrix: projectionMatrix)
+
+            encodeTessellatedGeometry(
+                encoder: encoder,
+                drawCalls: drawCalls,
+                viewMatrix: viewMatrix,
+                projectionMatrix: projectionMatrix)
         }
 
         encoder.endEncoding()
     }
 
-    func encodeLightingPass(commandBuffer: MTLCommandBuffer,
-                            renderPassDescriptor: MTLRenderPassDescriptor,
-                            viewPosition: simd_float3,
-                            ambient: MtlAmbientLight,
-                            directional: MtlDirectionalLight,
-                            points: [MtlPointLight],
-                            spots: [MtlSpotLight],
-                            inverseView: simd_float4x4,
-                            inverseProjection: simd_float4x4) {
+    func encodeLightingPass(
+        commandBuffer: MTLCommandBuffer,
+        renderPassDescriptor: MTLRenderPassDescriptor,
+        viewPosition: simd_float3,
+        ambient: MtlAmbientLight,
+        directional: MtlDirectionalLight,
+        points: [MtlPointLight],
+        spots: [MtlSpotLight],
+        inverseView: simd_float4x4,
+        inverseProjection: simd_float4x4
+    ) {
         // Pass 2 (deferred): fullscreen resolve from G-Buffer + lights to final color.
         let colorAttachment = renderPassDescriptor.colorAttachments[0]
         colorAttachment?.loadAction = .clear
@@ -244,7 +269,10 @@ final class RenderingSystem {
         renderPassDescriptor.depthAttachment.loadAction = .dontCare
         renderPassDescriptor.depthAttachment.storeAction = .dontCare
 
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else { return }
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+            return
+        }
+
         encoder.label = "LightingPass"
         encoder.setRenderPipelineState(lightingPSO)
         encoder.setDepthStencilState(depthStateLighting)
@@ -267,6 +295,7 @@ final class RenderingSystem {
         encoder.setFragmentBytes(&ambientLight, length: MemoryLayout<MtlAmbientLight>.stride, index: 1)
         encoder.setFragmentBytes(&dirLight, length: MemoryLayout<MtlDirectionalLight>.stride, index: 2)
         encoder.setFragmentBytes(&pointCount, length: MemoryLayout<UInt32>.stride, index: 3)
+
         if points.isEmpty {
             var dummy = MtlPointLight(
                 position: .zero,
@@ -274,16 +303,19 @@ final class RenderingSystem {
                 intensity: 0,
                 radius: 0
             )
-            encoder.setFragmentBytes(&dummy,
+            encoder.setFragmentBytes(
+                &dummy,
                 length: MemoryLayout<MtlPointLight>.stride,
                 index: 4)
         } else {
-            encoder.setFragmentBytes(points,
+            encoder.setFragmentBytes(
+                points,
                 length: MemoryLayout<MtlPointLight>.stride * points.count,
                 index: 4)
         }
 
         encoder.setFragmentBytes(&spotCount, length: MemoryLayout<UInt32>.stride, index: 5)
+
         if spots.isEmpty {
             var dummy = MtlSpotLight(
                 position: .zero,
@@ -295,11 +327,13 @@ final class RenderingSystem {
                 radius: 0
             )
 
-            encoder.setFragmentBytes(&dummy,
+            encoder.setFragmentBytes(
+                &dummy,
                 length: MemoryLayout<MtlSpotLight>.stride,
                 index: 6)
         } else {
-            encoder.setFragmentBytes(spots,
+            encoder.setFragmentBytes(
+                spots,
                 length: MemoryLayout<MtlSpotLight>.stride * spots.count,
                 index: 6)
         }
@@ -334,8 +368,10 @@ final class RenderingSystem {
         return descriptor
     }
 
-    private func encodeIndexedGeometry(drawCall: IndexedGeometryDrawCall,
-                                       encoder: MTLRenderCommandEncoder) {
+    private func encodeIndexedGeometry(
+        drawCall: IndexedGeometryDrawCall,
+        encoder: MTLRenderCommandEncoder
+    ) {
         var model = drawCall.modelMatrix
         var surfaceParams = simd_float2.zero
         encoder.setVertexBytes(&model, length: MemoryLayout<simd_float4x4>.stride, index: 1)
@@ -346,18 +382,25 @@ final class RenderingSystem {
         encoder.setFragmentBytes(&specularStrength, length: MemoryLayout<Float>.stride, index: 0)
         encoder.setFragmentTexture(drawCall.material.albedoTexture ?? fallbackAlbedoTexture, index: 0)
         encoder.setFragmentTexture(drawCall.material.normalTexture ?? fallbackNormalTexture, index: 1)
-        encoder.setVertexTexture(drawCall.material.displacementTexture ?? fallbackDisplacementTexture, index: 0)
-        encoder.drawIndexedPrimitives(type: drawCall.primitiveType,
-                                      indexCount: drawCall.indexCount,
-                                      indexType: drawCall.indexType,
-                                      indexBuffer: drawCall.indexBuffer,
-                                      indexBufferOffset: drawCall.indexBufferOffset)
+        encoder.setVertexTexture(
+            drawCall.material.displacementTexture ?? fallbackDisplacementTexture, index: 0)
+        encoder.drawIndexedPrimitives(
+            type: drawCall.primitiveType,
+            indexCount: drawCall.indexCount,
+            indexType: drawCall.indexType,
+            indexBuffer: drawCall.indexBuffer,
+            indexBufferOffset: drawCall.indexBufferOffset)
     }
 
-    private func encodeTessellationFactorPass(commandBuffer: MTLCommandBuffer,
-                                              drawCalls: [GeometryDrawCall],
-                                              cameraPosition: simd_float3) {
-        guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else { return }
+    private func encodeTessellationFactorPass(
+        commandBuffer: MTLCommandBuffer,
+        drawCalls: [GeometryDrawCall],
+        cameraPosition: simd_float3
+    ) {
+        guard let computeEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return
+        }
+
         computeEncoder.label = "TessellationFactorPass"
         computeEncoder.setComputePipelineState(tessellationFactorCSO)
 
@@ -365,12 +408,15 @@ final class RenderingSystem {
         computeEncoder.setBytes(&camera, length: MemoryLayout<simd_float3>.stride, index: 2)
 
         for drawCall in drawCalls {
-            guard case let .tessellated(tessellatedDrawCall) = drawCall else { continue }
+            guard case let .tessellated(tessellatedDrawCall) = drawCall else {
+                continue
+            }
 
             computeEncoder.setBuffer(tessellatedDrawCall.patchInfoBuffer, offset: 0, index: 0)
             computeEncoder.setBuffer(tessellatedDrawCall.tessellationFactorBuffer, offset: 0, index: 1)
 
-            let width = max(1, min(tessellationFactorCSO.threadExecutionWidth, tessellatedDrawCall.patchCount))
+            let width = max(
+                1, min(tessellationFactorCSO.threadExecutionWidth, tessellatedDrawCall.patchCount))
             let threadsPerThreadgroup = MTLSize(width: width, height: 1, depth: 1)
             let threadCount = MTLSize(width: tessellatedDrawCall.patchCount, height: 1, depth: 1)
             computeEncoder.dispatchThreads(threadCount, threadsPerThreadgroup: threadsPerThreadgroup)
@@ -379,10 +425,12 @@ final class RenderingSystem {
         computeEncoder.endEncoding()
     }
 
-    private func encodeTessellatedGeometry(encoder: MTLRenderCommandEncoder,
-                                           drawCalls: [GeometryDrawCall],
-                                           viewMatrix: simd_float4x4,
-                                           projectionMatrix: simd_float4x4) {
+    private func encodeTessellatedGeometry(
+        encoder: MTLRenderCommandEncoder,
+        drawCalls: [GeometryDrawCall],
+        viewMatrix: simd_float4x4,
+        projectionMatrix: simd_float4x4
+    ) {
         encoder.setRenderPipelineState(tessellationGeometryPSO)
 
         var view = viewMatrix
@@ -391,28 +439,37 @@ final class RenderingSystem {
         encoder.setVertexBytes(&projection, length: MemoryLayout<simd_float4x4>.stride, index: 3)
 
         for drawCall in drawCalls {
-            guard case let .tessellated(tessellatedDrawCall) = drawCall else { continue }
+            guard case let .tessellated(tessellatedDrawCall) = drawCall else {
+                continue
+            }
 
             var model = tessellatedDrawCall.modelMatrix
             var surfaceParams = TessellationSurfaceParams(
                 displacementScale: tessellatedDrawCall.displacementScale,
                 uvScale: tessellatedDrawCall.uvScale,
-                normalStrength: tessellatedDrawCall.material.normalTexture == nil ? 0.0 : tessellatedDrawCall.normalStrength,
+                normalStrength: tessellatedDrawCall.material.normalTexture == nil
+                    ? 0.0 : tessellatedDrawCall.normalStrength,
                 _padding: 0.0
             )
             var specularStrength = tessellatedDrawCall.material.specularStrength
 
             encoder.setVertexBuffer(tessellatedDrawCall.controlPointBuffer, offset: 0, index: 0)
             encoder.setVertexBytes(&model, length: MemoryLayout<simd_float4x4>.stride, index: 1)
-            encoder.setVertexBytes(&surfaceParams, length: MemoryLayout<TessellationSurfaceParams>.stride, index: 4)
-            encoder.setVertexTexture(tessellatedDrawCall.material.displacementTexture ?? fallbackDisplacementTexture, index: 0)
+            encoder.setVertexBytes(
+                &surfaceParams, length: MemoryLayout<TessellationSurfaceParams>.stride, index: 4)
+            encoder.setVertexTexture(
+                tessellatedDrawCall.material.displacementTexture ?? fallbackDisplacementTexture, index: 0)
 
             encoder.setFragmentBytes(&specularStrength, length: MemoryLayout<Float>.stride, index: 0)
-            encoder.setFragmentBytes(&surfaceParams, length: MemoryLayout<TessellationSurfaceParams>.stride, index: 1)
-            encoder.setFragmentTexture(tessellatedDrawCall.material.albedoTexture ?? fallbackAlbedoTexture, index: 0)
-            encoder.setFragmentTexture(tessellatedDrawCall.material.normalTexture ?? fallbackNormalTexture, index: 1)
+            encoder.setFragmentBytes(
+                &surfaceParams, length: MemoryLayout<TessellationSurfaceParams>.stride, index: 1)
+            encoder.setFragmentTexture(
+                tessellatedDrawCall.material.albedoTexture ?? fallbackAlbedoTexture, index: 0)
+            encoder.setFragmentTexture(
+                tessellatedDrawCall.material.normalTexture ?? fallbackNormalTexture, index: 1)
 
-            encoder.setTessellationFactorBuffer(tessellatedDrawCall.tessellationFactorBuffer, offset: 0, instanceStride: 0)
+            encoder.setTessellationFactorBuffer(
+                tessellatedDrawCall.tessellationFactorBuffer, offset: 0, instanceStride: 0)
             encoder.drawPatches(
                 numberOfPatchControlPoints: 4,
                 patchStart: 0,
@@ -425,7 +482,9 @@ final class RenderingSystem {
         }
     }
 
-    private static func buildIndexedGeometryPSO(device: MTLDevice, library: MTLLibrary, vertexDescriptor: MTLVertexDescriptor) -> MTLRenderPipelineState {
+    private static func buildIndexedGeometryPSO(
+        device: MTLDevice, library: MTLLibrary, vertexDescriptor: MTLVertexDescriptor
+    ) -> MTLRenderPipelineState {
         // MRT output for deferred geometry: color(0)=albedo/spec, color(1)=normal.
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.label = "IndexedGeometryPSO"
@@ -438,7 +497,9 @@ final class RenderingSystem {
         return try! device.makeRenderPipelineState(descriptor: descriptor)
     }
 
-    private static func buildTessellationGeometryPSO(device: MTLDevice, library: MTLLibrary) -> MTLRenderPipelineState {
+    private static func buildTessellationGeometryPSO(device: MTLDevice, library: MTLLibrary)
+        -> MTLRenderPipelineState
+    {
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.label = "TessellationGeometryPSO"
         descriptor.vertexFunction = library.makeFunction(name: "vertexTerrainTessellated")
@@ -456,7 +517,9 @@ final class RenderingSystem {
         return try! device.makeRenderPipelineState(descriptor: descriptor)
     }
 
-    private static func buildLightingPSO(device: MTLDevice, library: MTLLibrary, view: MTKView) -> MTLRenderPipelineState {
+    private static func buildLightingPSO(device: MTLDevice, library: MTLLibrary, view: MTKView)
+        -> MTLRenderPipelineState
+    {
         // Lighting pipeline writes directly to the swapchain color target.
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.label = "LightingPSO"
@@ -467,12 +530,16 @@ final class RenderingSystem {
         return try! device.makeRenderPipelineState(descriptor: descriptor)
     }
 
-    private static func buildTessellationFactorCSO(device: MTLDevice, library: MTLLibrary) -> MTLComputePipelineState {
+    private static func buildTessellationFactorCSO(device: MTLDevice, library: MTLLibrary)
+        -> MTLComputePipelineState
+    {
         let function = library.makeFunction(name: "computeTerrainTessellationFactors")!
         return try! device.makeComputePipelineState(function: function)
     }
 
-    private static func buildDepthState(device: MTLDevice, compare: MTLCompareFunction, write: Bool) -> MTLDepthStencilState {
+    private static func buildDepthState(device: MTLDevice, compare: MTLCompareFunction, write: Bool)
+        -> MTLDepthStencilState
+    {
         // Small helper to build depth behavior per pass.
         let descriptor = MTLDepthStencilDescriptor()
         descriptor.depthCompareFunction = compare
@@ -480,9 +547,11 @@ final class RenderingSystem {
         return device.makeDepthStencilState(descriptor: descriptor)!
     }
 
-    private static func makeFallbackTexture(device: MTLDevice,
-                                            pixelFormat: MTLPixelFormat,
-                                            bytes: [UInt8]) -> MTLTexture {
+    private static func makeFallbackTexture(
+        device: MTLDevice,
+        pixelFormat: MTLPixelFormat,
+        bytes: [UInt8]
+    ) -> MTLTexture {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: pixelFormat,
             width: 1,

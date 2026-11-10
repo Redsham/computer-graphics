@@ -23,11 +23,7 @@ int main(const int argc, char **argv) {
         PhongShader shader(scene.light, model, scene.camera);
 
         for (int f = 0; f < model.nfaces(); f++) {
-            Triangle clip = {
-                shader.vertex(f, 0),
-                shader.vertex(f, 1),
-                shader.vertex(f, 2)
-            };
+            Triangle clip = {shader.vertex(f, 0), shader.vertex(f, 1), shader.vertex(f, 2)};
 
             rasterize(clip, shader, Gl_Globals::FRAME_BUFFER, viewport);
         }

@@ -7,15 +7,16 @@ let package = Package(
     products: [
         .library(name: "EngineCore", targets: ["EngineCore"]),
         .library(name: "EngineMetal", targets: ["EngineMetal"]),
-        .library(name: "EngineMac", targets: ["EngineMac"])
+        .library(name: "EngineMac", targets: ["EngineMac"]),
     ],
     targets: [
         .target(name: "GPUShared"),
         .target(name: "EngineCore"),
-        .target(name: "EngineMetal", dependencies: ["EngineCore", "GPUShared"],
-                resources: [.process("Shaders")]),
+        .target(
+            name: "EngineMetal", dependencies: ["EngineCore", "GPUShared"],
+            resources: [.process("Shaders")]),
         .target(name: "EngineMac", dependencies: ["EngineCore", "EngineMetal"]),
         .testTarget(name: "EngineCoreTests", dependencies: ["EngineCore"]),
-        .testTarget(name: "EngineMetalTests", dependencies: ["EngineCore", "EngineMetal"])
+        .testTarget(name: "EngineMetalTests", dependencies: ["EngineCore", "EngineMetal"]),
     ]
 )

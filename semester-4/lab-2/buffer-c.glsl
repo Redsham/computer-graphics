@@ -18,42 +18,39 @@
 #define INPUT_LEFT 65
 #define INPUT_RIGHT 68
 
-
 // ===============
 // === Inputs ====
 // ===============
 
-float key(int k){
-    return texelFetch(iChannel1, ivec2(k,0), 0).r;
+float key(int k) {
+    return texelFetch(iChannel1, ivec2(k, 0), 0).r;
 }
 
 vec2 getVelocity() {
-    return texelFetch(iChannel0, ivec2(0,0), 0).xy;
+    return texelFetch(iChannel0, ivec2(0, 0), 0).xy;
 }
 
 float getRotation() {
-    return texelFetch(iChannel0, ivec2(0,0), 0).z;
+    return texelFetch(iChannel0, ivec2(0, 0), 0).z;
 }
 
 vec2 getPosition() {
     return texelFetch(iChannel0, ivec2(1, 0), 0).xy;
 }
 
-
 // ============
 // === Main ===
 // ============
 
-void mainImage(out vec4 fragColor, in vec2 fragCoord)
-{
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     // --- Restore data ---
     vec2 velocity = getVelocity();
     float rotation = getRotation();
 
     float dt = iTimeDelta;
-    
+
     /// --- Movement ---
-    if(int(fragCoord.x) == 1) {
+    if (int(fragCoord.x) == 1) {
         vec2 position = getPosition();
         position += velocity * dt;
         fragColor = vec4(position, 0.0, 0.0);
@@ -61,8 +58,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
     }
 
     // --- Input ---
-    float forward  = key(INPUT_FORWARD) - key(INPUT_BACKWARD);
-    float turn     = key(INPUT_RIGHT) - key(INPUT_LEFT);
+    float forward = key(INPUT_FORWARD) - key(INPUT_BACKWARD);
+    float turn = key(INPUT_RIGHT) - key(INPUT_LEFT);
 
     // --- Angular ---
     float angularVel = turn * TANK_ANGULAR_ACCEL;

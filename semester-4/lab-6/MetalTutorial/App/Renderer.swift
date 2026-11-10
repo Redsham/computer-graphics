@@ -32,8 +32,14 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     init?(metalKitView: MTKView) {
         // Bootstrap Metal device/queue and configure drawable formats.
-        guard let device = metalKitView.device ?? MTLCreateSystemDefaultDevice() else { return nil }
-        guard let queue = device.makeCommandQueue() else { return nil }
+        guard let device = metalKitView.device ?? MTLCreateSystemDefaultDevice() else {
+            return nil
+        }
+
+        guard let queue = device.makeCommandQueue() else {
+            return nil
+        }
+
         self.commandQueue = queue
 
         metalKitView.colorPixelFormat = .bgra8Unorm_srgb
@@ -43,7 +49,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         self.renderingSystem = RenderingSystem(device: device, view: metalKitView)
 
         self.ambientLight = MtlAmbientLight(color: simd_float3(repeating: 1.0), intensity: 0.03)
-        self.dirLight = MtlDirectionalLight(direction: simd_float3(0, -1, 0), color: simd_float3(1, 1, 1), intensity: 0.0)
+        self.dirLight = MtlDirectionalLight(
+            direction: simd_float3(0, -1, 0), color: simd_float3(1, 1, 1), intensity: 0.0)
         self.pointLights = []
         self.spotLights = []
 
@@ -63,13 +70,19 @@ final class Renderer: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         // Allocate per-frame command objects.
         guard let commandBuffer = commandQueue.makeCommandBuffer(),
-              let renderPassDescriptor = view.currentRenderPassDescriptor,
-              let drawable = view.currentDrawable else { return }
+            let renderPassDescriptor = view.currentRenderPassDescriptor,
+            let drawable = view.currentDrawable
+        else {
+            return
+        }
 
         updateFPS()
 
         // Update camera movement and derive matrices.
-        let deltaTime = max(Float(view.preferredFramesPerSecond > 0 ? 1.0 / Double(view.preferredFramesPerSecond) : 1.0 / 60.0), 1.0 / 240.0)
+        let deltaTime = max(
+            Float(
+                view.preferredFramesPerSecond > 0 ? 1.0 / Double(view.preferredFramesPerSecond) : 1.0 / 60.0),
+            1.0 / 240.0)
         cameraController?.update(deltaTime: deltaTime)
         impulseLightSystem.update(deltaTime: deltaTime)
 
@@ -80,6 +93,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             farPlane: 50000.0
         )
         let viewMat: simd_float4x4
+
         if let cameraController {
             viewPosition = cameraController.position
             viewMat = cameraController.viewMatrix
@@ -102,7 +116,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             projectionMatrix: projection
         )
 
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0.03, green: 0.04, blue: 0.055, alpha: 1.0)
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: 0.03, green: 0.04, blue: 0.055, alpha: 1.0)
         renderPassDescriptor.depthAttachment.clearDepth = 1.0
 
         // Deferred step B: fullscreen lighting pass reads G-Buffer and outputs lit scene.
@@ -134,7 +149,10 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     func spawnImpulseLightFromCamera() {
-        guard let cameraController else { return }
+        guard let cameraController else {
+            return
+        }
+
         let spawnOffset: Float = 1.0
         let spawnPosition = cameraController.position + cameraController.forwardVector * spawnOffset
         impulseLightSystem.spawn(at: spawnPosition, forward: cameraController.forwardVector)
@@ -142,23 +160,32 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     func setDebugPreviewMode(index: Int) {
         let mode: RenderingSystem.DebugPreviewMode
+
         switch index {
-        case 2: mode = .albedo
-        case 3: mode = .normal
-        case 4: mode = .depth
-        case 5: mode = .worldPosition
-        case 6: mode = .wireframe
-        default: mode = .lit
+        case 2:
+            mode = .albedo
+        case 3:
+            mode = .normal
+        case 4:
+            mode = .depth
+        case 5:
+            mode = .worldPosition
+        case 6:
+            mode = .wireframe
+        default:
+            mode = .lit
         }
+
         renderingSystem.setDebugPreviewMode(mode)
         onDebugModeUpdate?(debugModeTitle(for: mode))
     }
 
     private func loadScene(device: MTLDevice) {
-        applyScene(TessellationScene(
-            device: device,
-            //geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
-        ))
+        applyScene(
+            TessellationScene(
+                device: device,
+                //geometryVertexDescriptor: RenderingSystem.makeGeometryVertexDescriptor()
+            ))
     }
 
     private func applyScene(_ nextScene: any RenderScene) {
@@ -195,12 +222,16 @@ final class Renderer: NSObject, MTKViewDelegate {
         let frameTime = now - lastFPSUpdateTime
         lastFPSUpdateTime = now
 
-        guard frameTime > 0 else { return }
+        guard frameTime > 0 else {
+            return
+        }
 
         accumulatedFrameTime += frameTime
         accumulatedFrameCount += 1
 
-        guard accumulatedFrameTime >= 0.25 else { return }
+        guard accumulatedFrameTime >= 0.25 else {
+            return
+        }
 
         let fps = Double(accumulatedFrameCount) / accumulatedFrameTime
         accumulatedFrameTime = 0.0

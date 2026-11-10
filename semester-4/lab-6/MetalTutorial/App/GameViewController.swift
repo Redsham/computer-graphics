@@ -71,27 +71,37 @@ class GameViewController: NSViewController {
     }
 
     private func installDebugPreviewHotkeys() {
-        if let keyDown = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard let self else { return event }
-            let modeByKeyCode: [UInt16: Int] = [
-                122: 1, // F1 - финальный свет
-                120: 2, // F2 - albedo
-                99: 3,  // F3 - normal
-                118: 4, // F4 - depth
-                96: 5,  // F5 - reconstructed world position
-                97: 6   // F6 - wireframe
-            ]
+        if let keyDown = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown,
+            handler: { [weak self] event in
+                guard let self else {
+                    return event
+                }
 
-            if event.keyCode == 49, !event.isARepeat { // Space
-                renderer.spawnImpulseLightFromCamera()
+                let modeByKeyCode: [UInt16: Int] = [
+                    122: 1,  // F1 - финальный свет
+                    120: 2,  // F2 - albedo
+                    99: 3,  // F3 - normal
+                    118: 4,  // F4 - depth
+                    96: 5,  // F5 - reconstructed world position
+                    97: 6,  // F6 - wireframe
+                ]
+
+                if event.keyCode == 49, !event.isARepeat {  // Space
+                    renderer.spawnImpulseLightFromCamera()
+                    return nil
+                }
+
+                guard let mode = modeByKeyCode[event.keyCode] else {
+                    return event
+                }
+
+                renderer.setDebugPreviewMode(index: mode)
+
+                print("[Renderer] Debug preview mode -> F\(mode)")
                 return nil
-            }
-
-            guard let mode = modeByKeyCode[event.keyCode] else { return event }
-            renderer.setDebugPreviewMode(index: mode)
-            print("[Renderer] Debug preview mode -> F\(mode)")
-            return nil
-        }) {
+            })
+        {
             eventMonitors.append(keyDown)
         }
     }
@@ -119,7 +129,7 @@ class GameViewController: NSViewController {
             hudLabel.topAnchor.constraint(equalTo: view.topAnchor, constant: 14),
             hudLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 14),
             hudLabel.widthAnchor.constraint(equalToConstant: 170),
-            hudLabel.heightAnchor.constraint(equalToConstant: 44)
+            hudLabel.heightAnchor.constraint(equalToConstant: 44),
         ])
     }
 

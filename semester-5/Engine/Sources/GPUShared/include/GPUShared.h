@@ -12,12 +12,22 @@ typedef vector_float4 GPUVector;
 #endif
 
 enum { GPUVertexBinding = 0, GPUFrameBinding = 1, GPUObjectBinding = 2, GPUColorTexture = 0 };
-typedef struct { GPUVector position; GPUVector normal; } GPUVertex;
+
+typedef struct {
+    GPUVector position;
+    GPUVector normal;
+} GPUVertex;
+
 typedef struct {
     GPUMatrix viewProjection;
     GPUVector lightDirection;
     GPUVector lightColor;
     GPUVector parameters; // x: exposure
 } GPUFrame;
-typedef struct { GPUMatrix model; GPUMatrix normalMatrix; GPUVector baseColor; } GPUObject;
+
+typedef struct {
+    GPUMatrix model;
+    GPUMatrix normalMatrix;
+    GPUVector baseColor;
+} GPUObject;
 #endif

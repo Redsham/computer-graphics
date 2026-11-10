@@ -8,12 +8,14 @@
 
 static std::string parentDir(const std::string &path) {
     const size_t slash = path.find_last_of("/\\");
-    if (slash == std::string::npos) return "";
+    if (slash == std::string::npos)
+        return "";
     return path.substr(0, slash + 1);
 }
 
 static bool load_tga(const std::string &directory, const aiString &path, TGAImage &img) {
-    if (path.length == 0) return false;
+    if (path.length == 0)
+        return false;
 
     const std::string filepath = directory + std::string(path.C_Str());
 
@@ -46,13 +48,9 @@ void Model::load_textures(const std::string &objPath, const aiMaterial *material
 Model::Model(const std::string &filename) {
     Assimp::Importer importer;
 
-    const aiScene *scene = importer.ReadFile(
-        filename,
-        aiProcess_Triangulate |
-        aiProcess_GenNormals |
-        aiProcess_CalcTangentSpace |
-        aiProcess_JoinIdenticalVertices
-    );
+    const aiScene *scene =
+        importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_GenNormals |
+                                        aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices);
 
     if (!scene || !scene->mRootNode || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
         std::cerr << "Assimp error: " << importer.GetErrorString() << std::endl;
@@ -103,22 +101,18 @@ Model::Model(const std::string &filename) {
 
 vec4 Model::normal(const vec2 &uv) const {
     if (normal_map.width() == 0 || normal_map.height() == 0)
-        return vec4{0, 0, 1, 0 };
+        return vec4{0, 0, 1, 0};
 
     TGAColor c = normal_map.get(uv.x * normal_map.width(), uv.y * normal_map.height());
-    return normalized(vec4{
-        static_cast<double>(c[2]) * 2.0 / 255.0 - 1.0,
-        static_cast<double>(c[1]) * 2.0 / 255.0 - 1.0,
-        static_cast<double>(c[0]) * 2.0 / 255.0 - 1.0,
-        0.0f
-    });
+    return normalized(vec4{static_cast<double>(c[2]) * 2.0 / 255.0 - 1.0,
+                           static_cast<double>(c[1]) * 2.0 / 255.0 - 1.0,
+                           static_cast<double>(c[0]) * 2.0 / 255.0 - 1.0, 0.0f});
 }
 
 std::string Model::debug_info() const {
     std::string str = "vertices: " + std::to_string(vertices.size()) +
                       ", normals: " + std::to_string(normals.size()) +
-                      ", uvs: " + std::to_string(uvs.size()) +
-                      ", faces: " + std::to_string(nfaces()) +
+                      ", uvs: " + std::to_string(uvs.size()) + ", faces: " + std::to_string(nfaces()) +
                       ", diffuse map: " + (diffuse_map.width() > 0 ? "yes" : "no") +
                       ", normal map: " + (normal_map.width() > 0 ? "yes" : "no") +
                       ", specular map: " + (specular_map.width() > 0 ? "yes" : "no");

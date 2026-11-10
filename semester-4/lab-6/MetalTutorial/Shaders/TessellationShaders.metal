@@ -56,45 +56,38 @@ struct VSOutTerrain {
 };
 
 static inline TerrainControlPoint bilerpControlPoints(const device TerrainControlPoint *controlPoints,
-                                                      uint patchBase,
-                                                      float2 uv) {
+                                                      uint patchBase, float2 uv) {
     TerrainControlPoint cp00 = controlPoints[patchBase + 0];
     TerrainControlPoint cp10 = controlPoints[patchBase + 1];
     TerrainControlPoint cp01 = controlPoints[patchBase + 2];
     TerrainControlPoint cp11 = controlPoints[patchBase + 3];
 
     TerrainControlPoint result;
-    result.position = mix(mix(cp00.position, cp10.position, uv.x), mix(cp01.position, cp11.position, uv.x), uv.y);
+    result.position =
+        mix(mix(cp00.position, cp10.position, uv.x), mix(cp01.position, cp11.position, uv.x), uv.y);
     result.uv = mix(mix(cp00.uv, cp10.uv, uv.x), mix(cp01.uv, cp11.uv, uv.x), uv.y);
     return result;
 }
 
-static inline float sampleTerrainHeight(texture2d<float> displacementTex,
-                                        sampler displacementSampler,
-                                        float2 uv,
-                                        float displacementScale) {
+static inline float sampleTerrainHeight(texture2d<float> displacementTex, sampler displacementSampler,
+                                        float2 uv, float displacementScale) {
     if (displacementTex.get_width() == 0 || displacementTex.get_height() == 0) {
         return 0.0;
     }
     return (displacementTex.sample(displacementSampler, uv).r * 2.0 - 1.0) * displacementScale;
 }
 
-static inline float3 terrainObjectPosition(const device TerrainControlPoint *controlPoints,
-                                           uint patchBase,
-                                           float2 patchUV,
-                                           float2 scaledUV,
-                                           texture2d<float> displacementTex,
-                                           sampler displacementSampler,
-                                           float displacementScale) {
+static inline float3 terrainObjectPosition(const device TerrainControlPoint *controlPoints, uint patchBase,
+                                           float2 patchUV, float2 scaledUV, texture2d<float> displacementTex,
+                                           sampler displacementSampler, float displacementScale) {
     TerrainControlPoint surfacePoint = bilerpControlPoints(controlPoints, patchBase, patchUV);
-    return surfacePoint.position + float3(0.0, sampleTerrainHeight(displacementTex, displacementSampler, scaledUV, displacementScale), 0.0);
+    return surfacePoint.position +
+           float3(0.0, sampleTerrainHeight(displacementTex, displacementSampler, scaledUV, displacementScale),
+                  0.0);
 }
 
-static inline float quantizedTessellationFactor(float distance,
-                                                float minFactor,
-                                                float maxFactor,
-                                                float minDistance,
-                                                float maxDistance) {
+static inline float quantizedTessellationFactor(float distance, float minFactor, float maxFactor,
+                                                float minDistance, float maxDistance) {
     float range = max(maxDistance - minDistance, 1.0);
     float t = saturate((distance - minDistance) / range);
     // Exponential falloff keeps detail near the camera and drops it off much faster in the distance.
@@ -109,32 +102,21 @@ kernel void computeTerrainTessellationFactors(const device TessellationPatchInfo
                                               constant float3 &cameraPos [[buffer(2)]],
                                               uint patchID [[thread_position_in_grid]]) {
     TessellationPatchInfo info = patchInfos[patchID];
-    float insideFactor = quantizedTessellationFactor(length(cameraPos - info.patchCenter),
-                                                     info.minFactor,
-                                                     info.maxFactor,
-                                                     info.minDistance,
-                                                     info.maxDistance);
+    float insideFactor = quantizedTessellationFactor(length(cameraPos - info.patchCenter), info.minFactor,
+                                                     info.maxFactor, info.minDistance, info.maxDistance);
 
-    factors[patchID].edgeTessellationFactor[0] = half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint0),
-                                                                                  info.minFactor,
-                                                                                  info.maxFactor,
-                                                                                  info.minDistance,
-                                                                                  info.maxDistance));
-    factors[patchID].edgeTessellationFactor[1] = half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint1),
-                                                                                  info.minFactor,
-                                                                                  info.maxFactor,
-                                                                                  info.minDistance,
-                                                                                  info.maxDistance));
-    factors[patchID].edgeTessellationFactor[2] = half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint2),
-                                                                                  info.minFactor,
-                                                                                  info.maxFactor,
-                                                                                  info.minDistance,
-                                                                                  info.maxDistance));
-    factors[patchID].edgeTessellationFactor[3] = half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint3),
-                                                                                  info.minFactor,
-                                                                                  info.maxFactor,
-                                                                                  info.minDistance,
-                                                                                  info.maxDistance));
+    factors[patchID].edgeTessellationFactor[0] =
+        half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint0), info.minFactor,
+                                         info.maxFactor, info.minDistance, info.maxDistance));
+    factors[patchID].edgeTessellationFactor[1] =
+        half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint1), info.minFactor,
+                                         info.maxFactor, info.minDistance, info.maxDistance));
+    factors[patchID].edgeTessellationFactor[2] =
+        half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint2), info.minFactor,
+                                         info.maxFactor, info.minDistance, info.maxDistance));
+    factors[patchID].edgeTessellationFactor[3] =
+        half(quantizedTessellationFactor(length(cameraPos - info.edgeMidpoint3), info.minFactor,
+                                         info.maxFactor, info.minDistance, info.maxDistance));
     factors[patchID].insideTessellationFactor[0] = half(insideFactor);
     factors[patchID].insideTessellationFactor[1] = half(insideFactor);
 }
@@ -152,24 +134,30 @@ vertex VSOutTerrain vertexTerrainTessellated(uint patchID [[patch_id]],
     VSOutTerrain out;
 
     uint patchBase = patchID * 4;
-    float2 scaledUV = bilerpControlPoints(controlPoints, patchBase, positionInPatch).uv * surfaceParams.uvScale;
+    float2 scaledUV =
+        bilerpControlPoints(controlPoints, patchBase, positionInPatch).uv * surfaceParams.uvScale;
 
     float texelU = displacementTex.get_width() > 0 ? 1.0 / float(displacementTex.get_width()) : 0.001;
     float texelV = displacementTex.get_height() > 0 ? 1.0 / float(displacementTex.get_height()) : 0.001;
     float2 uvDX = float2(texelU, 0.0);
     float2 uvDY = float2(0.0, texelV);
-    float2 patchStep = float2(texelU / max(surfaceParams.uvScale.x, 1e-3),
-                              texelV / max(surfaceParams.uvScale.y, 1e-3));
+    float2 patchStep =
+        float2(texelU / max(surfaceParams.uvScale.x, 1e-3), texelV / max(surfaceParams.uvScale.y, 1e-3));
     float2 patchUVx0 = clamp(positionInPatch - float2(patchStep.x, 0.0), 0.0, 1.0);
     float2 patchUVx1 = clamp(positionInPatch + float2(patchStep.x, 0.0), 0.0, 1.0);
     float2 patchUVy0 = clamp(positionInPatch - float2(0.0, patchStep.y), 0.0, 1.0);
     float2 patchUVy1 = clamp(positionInPatch + float2(0.0, patchStep.y), 0.0, 1.0);
 
-    float3 P = terrainObjectPosition(controlPoints, patchBase, positionInPatch, scaledUV, displacementTex, displacementSampler, surfaceParams.displacementScale);
-    float3 Px0 = terrainObjectPosition(controlPoints, patchBase, patchUVx0, scaledUV - uvDX, displacementTex, displacementSampler, surfaceParams.displacementScale);
-    float3 Px1 = terrainObjectPosition(controlPoints, patchBase, patchUVx1, scaledUV + uvDX, displacementTex, displacementSampler, surfaceParams.displacementScale);
-    float3 Py0 = terrainObjectPosition(controlPoints, patchBase, patchUVy0, scaledUV - uvDY, displacementTex, displacementSampler, surfaceParams.displacementScale);
-    float3 Py1 = terrainObjectPosition(controlPoints, patchBase, patchUVy1, scaledUV + uvDY, displacementTex, displacementSampler, surfaceParams.displacementScale);
+    float3 P = terrainObjectPosition(controlPoints, patchBase, positionInPatch, scaledUV, displacementTex,
+                                     displacementSampler, surfaceParams.displacementScale);
+    float3 Px0 = terrainObjectPosition(controlPoints, patchBase, patchUVx0, scaledUV - uvDX, displacementTex,
+                                       displacementSampler, surfaceParams.displacementScale);
+    float3 Px1 = terrainObjectPosition(controlPoints, patchBase, patchUVx1, scaledUV + uvDX, displacementTex,
+                                       displacementSampler, surfaceParams.displacementScale);
+    float3 Py0 = terrainObjectPosition(controlPoints, patchBase, patchUVy0, scaledUV - uvDY, displacementTex,
+                                       displacementSampler, surfaceParams.displacementScale);
+    float3 Py1 = terrainObjectPosition(controlPoints, patchBase, patchUVy1, scaledUV + uvDY, displacementTex,
+                                       displacementSampler, surfaceParams.displacementScale);
 
     float3 tangentX = Px1 - Px0;
     float3 tangentY = Py1 - Py0;
@@ -197,9 +185,7 @@ fragment GBufferOut fragmentTerrainGeometry(VSOutTerrain in [[stage_in]],
         out.albedo = float4(albedoTex.sample(linearRepeat, in.uv).rgb, saturate(specularStrength));
     }
     float3 N = normalize(in.worldNormal);
-    if (surfaceParams.normalStrength > 0.0 &&
-        normalTex.get_width() > 0 &&
-        normalTex.get_height() > 0) {
+    if (surfaceParams.normalStrength > 0.0 && normalTex.get_width() > 0 && normalTex.get_height() > 0) {
         float3 dPdx = dfdx(in.worldPosition);
         float3 dPdy = dfdy(in.worldPosition);
         float2 dUVdx = dfdx(in.uv);

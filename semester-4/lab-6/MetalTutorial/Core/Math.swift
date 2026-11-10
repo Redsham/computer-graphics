@@ -54,11 +54,13 @@ func scaleMatrix(matrix: inout simd_float4x4, scale: simd_float3) {
     matrix[2] *= scale.z
 }
 
-func createViewMatrix(eyePosition: simd_float3, targetPosition: simd_float3, upVec: simd_float3) -> simd_float4x4 {
+func createViewMatrix(eyePosition: simd_float3, targetPosition: simd_float3, upVec: simd_float3)
+    -> simd_float4x4
+{
     let forward = normalize(targetPosition - eyePosition)
     let rightVec = normalize(simd_cross(forward, upVec))
     let up = simd_cross(rightVec, forward)
-    
+
     var matrix = matrix_identity_float4x4;
     matrix[0][0] = rightVec.x;
     matrix[1][0] = rightVec.y;
@@ -72,11 +74,13 @@ func createViewMatrix(eyePosition: simd_float3, targetPosition: simd_float3, upV
     matrix[3][0] = -dot(rightVec, eyePosition);
     matrix[3][1] = -dot(up, eyePosition);
     matrix[3][2] = -dot(forward, eyePosition);
-    
+
     return matrix;
 }
 
-func createPerspectiveMatrix(fov: Float, aspectRatio: Float, nearPlane: Float, farPlane: Float) -> simd_float4x4 {
+func createPerspectiveMatrix(fov: Float, aspectRatio: Float, nearPlane: Float, farPlane: Float)
+    -> simd_float4x4
+{
     let tanHalfFov = tan(fov / 2.0);
 
     var matrix = simd_float4x4(0.0);
@@ -85,6 +89,6 @@ func createPerspectiveMatrix(fov: Float, aspectRatio: Float, nearPlane: Float, f
     matrix[2][2] = farPlane / (farPlane - nearPlane);
     matrix[2][3] = 1.0;
     matrix[3][2] = -(farPlane * nearPlane) / (farPlane - nearPlane);
-    
+
     return matrix;
 }

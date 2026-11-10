@@ -15,18 +15,24 @@ struct VertexOut {
     float3 normal;
 };
 
-vertex VertexOut vertexFunction(Vertex in [[stage_in]], constant float4x4& projectionMatrix [[buffer(0)]], constant float4x4& viewMatrix [[buffer(1)]], constant float4x4& modelMatrix [[buffer(2)]]) {
+vertex VertexOut vertexFunction(Vertex in [[stage_in]], constant float4x4 &projectionMatrix [[buffer(0)]],
+                                constant float4x4 &viewMatrix [[buffer(1)]],
+                                constant float4x4 &modelMatrix [[buffer(2)]]) {
     VertexOut out;
     out.worldPosition = (modelMatrix * float4(in.position, 1.0)).xyz;
     out.position = projectionMatrix * viewMatrix * float4(out.worldPosition, 1.0);
     out.texCoord = in.texCoord;
     out.normal = in.normal;
-    
+
     return out;
 }
 
-vertex VertexOut clothVertexFunction(Vertex in [[stage_in]], constant float4x4& projectionMatrix [[buffer(0)]], constant float4x4& viewMatrix [[buffer(1)]], constant float4x4& modelMatrix [[buffer(2)]], constant float& time [[buffer(3)]]) {
-    
+vertex VertexOut clothVertexFunction(Vertex in [[stage_in]],
+                                     constant float4x4 &projectionMatrix [[buffer(0)]],
+                                     constant float4x4 &viewMatrix [[buffer(1)]],
+                                     constant float4x4 &modelMatrix [[buffer(2)]],
+                                     constant float &time [[buffer(3)]]) {
+
     VertexOut out;
 
     float wave = sin(in.position.x * 0.1 + time * 2.0);
@@ -53,32 +59,38 @@ constant float3 lightSpecular = float3(0.8);
 
 constant float2 tilingSize = float2(1.0, 1.0);
 
-inline float3 phongLighting(float3 worldPosition, float3 diffuseColor, float specularColor, float3 normal, float3 viewPosition) {
+inline float3 phongLighting(float3 worldPosition, float3 diffuseColor, float specularColor, float3 normal,
+                            float3 viewPosition) {
     //Ambient
     float3 ambient = lightAmbient * diffuseColor;
-    
+
     //Diffuse
     float3 diff = max(dot(normal, -lightDirection), 0.0);
     float3 diffuse = lightDiffuse * diff * diffuseColor;
-    
+
     //Specular
     float3 viewDir = normalize(viewPosition - worldPosition);
     float3 reflectDir = reflect(lightDirection, normal);
     float3 spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     float3 specular = lightSpecular * spec * specularColor;
-    
+
     return ambient + diffuse + specular;
 }
 
-fragment float4 fragmentFunction(VertexOut in [[stage_in]], constant float3& viewPosition [[buffer(0)]], constant float& time [[buffer(1)]], texture2d<float> diffuseTexture [[texture(0)]], texture2d<float> specularTexture [[texture(1)]]) {
-    constexpr sampler colorSampler(mip_filter::linear, mag_filter::linear, min_filter::linear, address::repeat);
+fragment float4 fragmentFunction(VertexOut in [[stage_in]], constant float3 &viewPosition [[buffer(0)]],
+                                 constant float &time [[buffer(1)]],
+                                 texture2d<float> diffuseTexture [[texture(0)]],
+                                 texture2d<float> specularTexture [[texture(1)]]) {
+    constexpr sampler colorSampler(mip_filter::linear, mag_filter::linear, min_filter::linear,
+                                   address::repeat);
 
     float2 animatedUV = in.texCoord + float2(time * 0.1, 0.0);
     animatedUV = fract(animatedUV * tilingSize);
 
-    float4 diffuseColor  = diffuseTexture.sample(colorSampler, animatedUV);
+    float4 diffuseColor = diffuseTexture.sample(colorSampler, animatedUV);
     float4 specularColor = specularTexture.sample(colorSampler, animatedUV);
-    
-    return float4(phongLighting(in.worldPosition, diffuseColor.rgb, specularColor.r, normalize(in.normal), viewPosition), 1.0);
-}
 
+    return float4(phongLighting(in.worldPosition, diffuseColor.rgb, specularColor.r, normalize(in.normal),
+                                viewPosition),
+                  1.0);
+}

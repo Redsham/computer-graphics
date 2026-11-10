@@ -36,38 +36,42 @@ enum GeometryPrimitives {
 
         let loader = MTKTextureLoader(device: device)
         let albedoTexture: MTLTexture?
+
         if let url = Bundle.main.url(forResource: "planks", withExtension: "png") {
             albedoTexture = try? loader.newTexture(URL: url, options: [MTKTextureLoader.Option.SRGB: false])
         } else {
             albedoTexture = nil
         }
 
-        return .indexed(IndexedGeometryDrawCall(
-            vertexBuffer: vertexBuffer,
-            vertexBufferOffset: 0,
-            indexBuffer: indexBuffer,
-            indexBufferOffset: 0,
-            indexCount: cubeIndices.count,
-            indexType: .uint16,
-            primitiveType: .triangle,
-            modelMatrix: matrix_identity_float4x4,
-            material: MaterialDrawState(
-                albedoTexture: albedoTexture,
-                normalTexture: nil,
-                displacementTexture: nil,
-                specularStrength: 0.45
-            )
-        ))
+        return .indexed(
+            IndexedGeometryDrawCall(
+                vertexBuffer: vertexBuffer,
+                vertexBufferOffset: 0,
+                indexBuffer: indexBuffer,
+                indexBufferOffset: 0,
+                indexCount: cubeIndices.count,
+                indexType: .uint16,
+                primitiveType: .triangle,
+                modelMatrix: matrix_identity_float4x4,
+                material: MaterialDrawState(
+                    albedoTexture: albedoTexture,
+                    normalTexture: nil,
+                    displacementTexture: nil,
+                    specularStrength: 0.45
+                )
+            ))
     }
 
-    static func makeTerrainPatch(device: MTLDevice,
-                                 size: Float = 420.0,
-                                 centerZ: Float = -220.0,
-                                 patchResolution: Int = 8,
-                                 minFactor: Float = 2.0,
-                                 maxFactor: Float = 24.0,
-                                 minDistance: Float = 150.0,
-                                 maxDistance: Float = 1500.0) -> TerrainPatchGeometry {
+    static func makeTerrainPatch(
+        device: MTLDevice,
+        size: Float = 420.0,
+        centerZ: Float = -220.0,
+        patchResolution: Int = 8,
+        minFactor: Float = 2.0,
+        maxFactor: Float = 24.0,
+        minDistance: Float = 150.0,
+        maxDistance: Float = 1500.0
+    ) -> TerrainPatchGeometry {
         let resolution = max(1, patchResolution)
         let halfSize = size * 0.5
         let patchSize = size / Float(resolution)
@@ -77,8 +81,8 @@ enum GeometryPrimitives {
         var patchInfos: [TessellationPatchInfo] = []
         patchInfos.reserveCapacity(resolution * resolution)
 
-        for z in 0 ..< resolution {
-            for x in 0 ..< resolution {
+        for z in 0..<resolution {
+            for x in 0..<resolution {
                 let x0 = -halfSize + Float(x) * patchSize
                 let x1 = x0 + patchSize
                 let z0 = centerZ - halfSize + Float(z) * patchSize
@@ -89,10 +93,14 @@ enum GeometryPrimitives {
                 let v0 = Float(z) / Float(resolution)
                 let v1 = Float(z + 1) / Float(resolution)
 
-                controlPoints.append(TerrainControlPoint(position: simd_float3(x0, 0.0, z0), uv: simd_float2(u0, v0)))
-                controlPoints.append(TerrainControlPoint(position: simd_float3(x1, 0.0, z0), uv: simd_float2(u1, v0)))
-                controlPoints.append(TerrainControlPoint(position: simd_float3(x0, 0.0, z1), uv: simd_float2(u0, v1)))
-                controlPoints.append(TerrainControlPoint(position: simd_float3(x1, 0.0, z1), uv: simd_float2(u1, v1)))
+                controlPoints.append(
+                    TerrainControlPoint(position: simd_float3(x0, 0.0, z0), uv: simd_float2(u0, v0)))
+                controlPoints.append(
+                    TerrainControlPoint(position: simd_float3(x1, 0.0, z0), uv: simd_float2(u1, v0)))
+                controlPoints.append(
+                    TerrainControlPoint(position: simd_float3(x0, 0.0, z1), uv: simd_float2(u0, v1)))
+                controlPoints.append(
+                    TerrainControlPoint(position: simd_float3(x1, 0.0, z1), uv: simd_float2(u1, v1)))
 
                 patchInfos.append(
                     TessellationPatchInfo(
@@ -126,35 +134,35 @@ enum GeometryPrimitives {
     }
 
     private static let cubeVertices: [Vertex] = [
-        Vertex(position: simd_float3(-0.5, -0.5,  0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(0, 0)),
-        Vertex(position: simd_float3( 0.5, -0.5,  0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3( 0.5,  0.5,  0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3(-0.5,  0.5,  0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(0, 1)),
+        Vertex(position: simd_float3(-0.5, -0.5, 0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(0, 0)),
+        Vertex(position: simd_float3(0.5, -0.5, 0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(1, 0)),
+        Vertex(position: simd_float3(0.5, 0.5, 0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(-0.5, 0.5, 0.5), normal: simd_float3(0, 0, 1), uv: simd_float2(0, 1)),
 
-        Vertex(position: simd_float3( 0.5, -0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(0, 0)),
+        Vertex(position: simd_float3(0.5, -0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(0, 0)),
         Vertex(position: simd_float3(-0.5, -0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3(-0.5,  0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3( 0.5,  0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(0, 1)),
+        Vertex(position: simd_float3(-0.5, 0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(0.5, 0.5, -0.5), normal: simd_float3(0, 0, -1), uv: simd_float2(0, 1)),
 
         Vertex(position: simd_float3(-0.5, -0.5, -0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(0, 0)),
-        Vertex(position: simd_float3(-0.5, -0.5,  0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3(-0.5,  0.5,  0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3(-0.5,  0.5, -0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(0, 1)),
+        Vertex(position: simd_float3(-0.5, -0.5, 0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(1, 0)),
+        Vertex(position: simd_float3(-0.5, 0.5, 0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(-0.5, 0.5, -0.5), normal: simd_float3(-1, 0, 0), uv: simd_float2(0, 1)),
 
-        Vertex(position: simd_float3( 0.5, -0.5,  0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(0, 0)),
-        Vertex(position: simd_float3( 0.5, -0.5, -0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3( 0.5,  0.5, -0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3( 0.5,  0.5,  0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(0, 1)),
+        Vertex(position: simd_float3(0.5, -0.5, 0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(0, 0)),
+        Vertex(position: simd_float3(0.5, -0.5, -0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(1, 0)),
+        Vertex(position: simd_float3(0.5, 0.5, -0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(0.5, 0.5, 0.5), normal: simd_float3(1, 0, 0), uv: simd_float2(0, 1)),
 
-        Vertex(position: simd_float3(-0.5,  0.5,  0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(0, 0)),
-        Vertex(position: simd_float3( 0.5,  0.5,  0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3( 0.5,  0.5, -0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3(-0.5,  0.5, -0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(0, 1)),
+        Vertex(position: simd_float3(-0.5, 0.5, 0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(0, 0)),
+        Vertex(position: simd_float3(0.5, 0.5, 0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(1, 0)),
+        Vertex(position: simd_float3(0.5, 0.5, -0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(-0.5, 0.5, -0.5), normal: simd_float3(0, 1, 0), uv: simd_float2(0, 1)),
 
         Vertex(position: simd_float3(-0.5, -0.5, -0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(0, 0)),
-        Vertex(position: simd_float3( 0.5, -0.5, -0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(1, 0)),
-        Vertex(position: simd_float3( 0.5, -0.5,  0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(1, 1)),
-        Vertex(position: simd_float3(-0.5, -0.5,  0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(0, 1))
+        Vertex(position: simd_float3(0.5, -0.5, -0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(1, 0)),
+        Vertex(position: simd_float3(0.5, -0.5, 0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(1, 1)),
+        Vertex(position: simd_float3(-0.5, -0.5, 0.5), normal: simd_float3(0, -1, 0), uv: simd_float2(0, 1)),
     ]
 
     private static let cubeIndices: [UInt16] = [
@@ -163,6 +171,6 @@ enum GeometryPrimitives {
         8, 9, 10, 10, 11, 8,
         12, 13, 14, 14, 15, 12,
         16, 17, 18, 18, 19, 16,
-        20, 21, 22, 22, 23, 20
+        20, 21, 22, 22, 23, 20,
     ]
 }

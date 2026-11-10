@@ -7,11 +7,9 @@
 
 #include "math/vec.h"
 
-template <int N>
-struct dt;
+template <int N> struct dt;
 
-template <int R, int C>
-struct mat {
+template <int R, int C> struct mat {
     vec<C> rows[R] = {};
 
     mat() = default;
@@ -52,9 +50,11 @@ struct mat {
     double cofactor(int row, int col) const {
         mat<R - 1, C - 1> submatrix;
         for (int i = 0, si = 0; i < R; ++i) {
-            if (i == row) continue;
+            if (i == row)
+                continue;
             for (int j = 0, sj = 0; j < C; ++j) {
-                if (j == col) continue;
+                if (j == col)
+                    continue;
                 submatrix[si][sj] = rows[i][j];
                 ++sj;
             }
@@ -89,13 +89,11 @@ struct mat {
     }
 };
 
-template <int R, int C>
- vec<C> operator*(const vec<R> &lhs, const mat<R, C> &rhs) {
+template <int R, int C> vec<C> operator*(const vec<R> &lhs, const mat<R, C> &rhs) {
     return (mat<1, R>{{lhs}} * rhs)[0];
 }
 
-template <int R, int C>
- vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
+template <int R, int C> vec<R> operator*(const mat<R, C> &lhs, const vec<C> &rhs) {
     vec<R> ret;
     for (int i = 0; i < R; ++i) {
         ret[i] = lhs[i] * rhs;
@@ -103,8 +101,7 @@ template <int R, int C>
     return ret;
 }
 
-template <int R1, int C1, int C2>
- mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
+template <int R1, int C1, int C2> mat<R1, C2> operator*(const mat<R1, C1> &lhs, const mat<C1, C2> &rhs) {
     mat<R1, C2> result;
     for (int i = 0; i < R1; ++i)
         for (int j = 0; j < C2; ++j)
@@ -113,8 +110,7 @@ template <int R1, int C1, int C2>
     return result;
 }
 
-template <int R, int C>
- mat<R, C> operator*(const mat<R, C> &lhs, double val) {
+template <int R, int C> mat<R, C> operator*(const mat<R, C> &lhs, double val) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         result[i] = lhs[i] * val;
@@ -122,8 +118,7 @@ template <int R, int C>
     return result;
 }
 
-template <int R, int C>
- mat<R, C> operator/(const mat<R, C> &lhs, double val) {
+template <int R, int C> mat<R, C> operator/(const mat<R, C> &lhs, double val) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         result[i] = lhs[i] / val;
@@ -131,8 +126,7 @@ template <int R, int C>
     return result;
 }
 
-template <int R, int C>
- mat<R, C> operator+(const mat<R, C> &lhs, const mat<R, C> &rhs) {
+template <int R, int C> mat<R, C> operator+(const mat<R, C> &lhs, const mat<R, C> &rhs) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         for (int j = 0; j < C; ++j) {
@@ -142,8 +136,7 @@ template <int R, int C>
     return result;
 }
 
-template <int R, int C>
- mat<R, C> operator-(const mat<R, C> &lhs, const mat<R, C> &rhs) {
+template <int R, int C> mat<R, C> operator-(const mat<R, C> &lhs, const mat<R, C> &rhs) {
     mat<R, C> result;
     for (int i = 0; i < R; ++i) {
         for (int j = 0; j < C; ++j) {
@@ -153,16 +146,14 @@ template <int R, int C>
     return result;
 }
 
-template <int R, int C>
- std::ostream &operator<<(std::ostream &out, const mat<R, C> &m) {
+template <int R, int C> std::ostream &operator<<(std::ostream &out, const mat<R, C> &m) {
     for (int i = 0; i < R; ++i) {
         out << m[i] << std::endl;
     }
     return out;
 }
 
-template <int N>
-struct dt {
+template <int N> struct dt {
     static double det(const mat<N, N> &src) {
         double ret = 0;
         for (int i = 0; i < N; ++i) {
@@ -172,8 +163,7 @@ struct dt {
     }
 };
 
-template <>
-struct dt<1> {
+template <> struct dt<1> {
     static double det(const mat<1, 1> &src) {
         return src[0][0];
     }

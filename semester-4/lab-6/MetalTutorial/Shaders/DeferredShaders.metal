@@ -5,7 +5,7 @@ using namespace metal;
 struct VertexIn {
     float3 position [[attribute(0)]];
     float2 texCoord [[attribute(1)]];
-    float3 normal   [[attribute(2)]];
+    float3 normal [[attribute(2)]];
 };
 
 struct VSOutGeo {
@@ -29,10 +29,8 @@ static inline float3x3 normalMatrix(float4x4 model) {
     return transpose(inverse3x3(upper));
 }
 
-vertex VSOutGeo vertexGeometry(VertexIn in [[stage_in]],
-                               constant float4x4 &model [[buffer(1)]],
-                               constant float4x4 &view [[buffer(2)]],
-                               constant float4x4 &proj [[buffer(3)]],
+vertex VSOutGeo vertexGeometry(VertexIn in [[stage_in]], constant float4x4 &model [[buffer(1)]],
+                               constant float4x4 &view [[buffer(2)]], constant float4x4 &proj [[buffer(3)]],
                                constant float3 &cameraPos [[buffer(4)]],
                                constant float2 &surfaceParams [[buffer(5)]],
                                texture2d<float> displacementTex [[texture(0)]]) {
@@ -54,8 +52,7 @@ struct GBufferOut {
     float4 normal [[color(1)]];
 };
 
-fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]],
-                                     constant float &specularStrength [[buffer(0)]],
+fragment GBufferOut fragmentGeometry(VSOutGeo in [[stage_in]], constant float &specularStrength [[buffer(0)]],
                                      texture2d<float> albedoTex [[texture(0)]],
                                      texture2d<float> normalTex [[texture(1)]]) {
     // Write material properties into MRT G-Buffer attachments.
@@ -89,16 +86,11 @@ struct VSOutFullscreen {
 
 vertex VSOutFullscreen vertexFullscreen(uint vertexID [[vertex_id]]) {
     // Fullscreen single-triangle generator for the lighting resolve pass.
-    constexpr float2 positions[3] = {
-        float2(-1.0, -1.0),
-        float2(3.0, -1.0),
-        float2(-1.0, 3.0)
-    };
+    constexpr float2 positions[3] = {float2(-1.0, -1.0), float2(3.0, -1.0), float2(-1.0, 3.0)};
 
     VSOutFullscreen out;
     out.position = float4(positions[vertexID], 0.0, 1.0);
-    out.uv = float2(positions[vertexID].x * 0.5 + 0.5,
-                    0.5 - positions[vertexID].y * 0.5);
+    out.uv = float2(positions[vertexID].x * 0.5 + 0.5, 0.5 - positions[vertexID].y * 0.5);
     return out;
 }
 
@@ -123,7 +115,8 @@ struct MtlSpotLight {
     float4 params;
 };
 
-float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrength, constant MtlDirectionalLight &L) {
+float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrength,
+                        constant MtlDirectionalLight &L) {
     // Classic Blinn-Phong directional contribution.
     float3 Ld = normalize(-L.direction.xyz);
     float NdotL = max(dot(N, Ld), 0.0);
@@ -136,7 +129,8 @@ float3 applyDirectional(float3 N, float3 V, float3 albedo, float specularStrengt
     return diffuse + specular;
 }
 
-float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, device const MtlPointLight &L) {
+float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStrength,
+                  device const MtlPointLight &L) {
     // Point light with radius-based attenuation.
     float3 Ld = L.positionRadius.xyz - P;
     float dist = max(length(Ld), 1e-4);
@@ -155,7 +149,8 @@ float3 applyPoint(float3 P, float3 N, float3 V, float3 albedo, float specularStr
     return diffuse + specular;
 }
 
-float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStrength, device const MtlSpotLight &L) {
+float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStrength,
+                 device const MtlSpotLight &L) {
     // Spot light with cone + distance attenuation.
     float3 Ld = L.positionRadius.xyz - P;
     float dist = max(length(Ld), 1e-4);
@@ -178,20 +173,14 @@ float3 applySpot(float3 P, float3 N, float3 V, float3 albedo, float specularStre
     return diffuse + specular;
 }
 
-fragment float4 fragmentLighting(VSOutFullscreen in [[stage_in]],
-                                 texture2d<float> gAlbedo [[texture(0)]],
-                                 texture2d<float> gNormal [[texture(1)]],
-                                 depth2d<float> gDepth [[texture(2)]],
-                                 constant float3 &eyePos [[buffer(0)]],
-                                 constant MtlAmbientLight &ambientLight [[buffer(1)]],
-                                 constant MtlDirectionalLight &dLight [[buffer(2)]],
-                                 constant uint &pointCount [[buffer(3)]],
-                                 const device MtlPointLight *pointLights [[buffer(4)]],
-                                 constant uint &spotCount [[buffer(5)]],
-                                 const device MtlSpotLight *spotLights [[buffer(6)]],
-                                 constant float4x4 &invView [[buffer(7)]],
-                                 constant float4x4 &invProj [[buffer(8)]],
-                                 constant int &previewMode [[buffer(9)]]) {
+fragment float4 fragmentLighting(
+    VSOutFullscreen in [[stage_in]], texture2d<float> gAlbedo [[texture(0)]],
+    texture2d<float> gNormal [[texture(1)]], depth2d<float> gDepth [[texture(2)]],
+    constant float3 &eyePos [[buffer(0)]], constant MtlAmbientLight &ambientLight [[buffer(1)]],
+    constant MtlDirectionalLight &dLight [[buffer(2)]], constant uint &pointCount [[buffer(3)]],
+    const device MtlPointLight *pointLights [[buffer(4)]], constant uint &spotCount [[buffer(5)]],
+    const device MtlSpotLight *spotLights [[buffer(6)]], constant float4x4 &invView [[buffer(7)]],
+    constant float4x4 &invProj [[buffer(8)]], constant int &previewMode [[buffer(9)]]) {
     // Deferred lighting stage:
     // 1) read packed G-Buffer,
     // 2) reconstruct world position from depth,

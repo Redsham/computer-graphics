@@ -16,6 +16,7 @@ final class DeferredScene: RenderScene {
 
     init(device: MTLDevice, geometryVertexDescriptor: MTLVertexDescriptor) {
         let importer = USDSceneImporter(device: device)
+
         if let geometry = importer.loadSponzaScene(vertexDescriptor: geometryVertexDescriptor) {
             self.drawCalls = geometry.drawCalls
             self.prefersOrbitingCamera = false
@@ -29,13 +30,25 @@ final class DeferredScene: RenderScene {
                 intensity: 0.02
             )
             self.pointLights = [
-                MtlPointLight(position: simd_float3(-500.0, 300.0, 0.0), color: simd_float3(1.0, 0.55, 0.32), intensity: 2.0, radius: 700.0),
-                MtlPointLight(position: simd_float3(0.0, 300.0, -400.0), color: simd_float3(0.35, 0.55, 1.0), intensity: 2.0, radius: 800.0),
-                MtlPointLight(position: simd_float3(500.0, 300.0, 150.0), color: simd_float3(1.0, 0.8, 0.45), intensity: 2.0, radius: 700.0),
-                MtlPointLight(position: simd_float3(0.0, 500.0, 600.0), color: simd_float3(0.5, 1.0, 0.8), intensity: 2.0, radius: 900.0)
+                MtlPointLight(
+                    position: simd_float3(-500.0, 300.0, 0.0), color: simd_float3(1.0, 0.55, 0.32),
+                    intensity: 2.0, radius: 700.0),
+                MtlPointLight(
+                    position: simd_float3(0.0, 300.0, -400.0), color: simd_float3(0.35, 0.55, 1.0),
+                    intensity: 2.0, radius: 800.0),
+                MtlPointLight(
+                    position: simd_float3(500.0, 300.0, 150.0), color: simd_float3(1.0, 0.8, 0.45),
+                    intensity: 2.0, radius: 700.0),
+                MtlPointLight(
+                    position: simd_float3(0.0, 500.0, 600.0), color: simd_float3(0.5, 1.0, 0.8),
+                    intensity: 2.0, radius: 900.0),
             ]
             self.spotLights = [
-                MtlSpotLight(position: simd_float3(-0.0, 300.0, 0.0), direction: simd_normalize(simd_float3(1.0, 0.0, 0.0)), color: simd_float3(1.0, 0.0, 0.0), intensity: 28.0, innerCos: cos(12.0 * .pi / 180.0), outerCos: cos(22.0 * .pi / 180.0), radius: 1800.0)
+                MtlSpotLight(
+                    position: simd_float3(-0.0, 300.0, 0.0),
+                    direction: simd_normalize(simd_float3(1.0, 0.0, 0.0)), color: simd_float3(1.0, 0.0, 0.0),
+                    intensity: 28.0, innerCos: cos(12.0 * .pi / 180.0), outerCos: cos(22.0 * .pi / 180.0),
+                    radius: 1800.0)
             ]
             print("[Renderer] Loaded Deferred scene: Sponza (\(geometry.drawCalls.count) draw calls)")
             return

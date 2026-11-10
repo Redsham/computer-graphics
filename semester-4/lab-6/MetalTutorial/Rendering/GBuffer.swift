@@ -29,26 +29,33 @@ final class GBuffer {
         // Recreate textures only when size changes.
         let w = max(Int(size.width), 1)
         let h = max(Int(size.height), 1)
-        guard w != width || h != height || albedo == nil else { return }
+
+        guard w != width || h != height || albedo == nil else {
+            return
+        }
+
         width = w
         height = h
 
         // MRT #0: albedo.rgb + specularStrength.a
-        let albedoDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+        let albedoDesc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
         albedoDesc.usage = [.renderTarget, .shaderRead]
         albedoDesc.storageMode = .private
         albedo = device.makeTexture(descriptor: albedoDesc)
         albedo.label = "GBuffer Albedo"
 
         // MRT #1: world normal.
-        let normalDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: w, height: h, mipmapped: false)
+        let normalDesc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba16Float, width: w, height: h, mipmapped: false)
         normalDesc.usage = [.renderTarget, .shaderRead]
         normalDesc.storageMode = .private
         normal = device.makeTexture(descriptor: normalDesc)
         normal.label = "GBuffer Normal"
 
         // Shared depth used by geometry write and lighting reconstruction.
-        let depthDesc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .depth32Float, width: w, height: h, mipmapped: false)
+        let depthDesc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float, width: w, height: h, mipmapped: false)
         depthDesc.usage = [.renderTarget, .shaderRead]
         depthDesc.storageMode = .private
         depth = device.makeTexture(descriptor: depthDesc)
