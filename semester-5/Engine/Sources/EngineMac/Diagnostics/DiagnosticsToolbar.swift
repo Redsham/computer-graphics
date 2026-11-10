@@ -41,6 +41,16 @@ import SwiftUI
                     }
                 }
 
+                Menu {
+                    ForEach([DockPanel.profiler, .frame]) { panel in
+                        Button(panel.title) {
+                            dock.show(panel)
+                        }
+                    }
+                } label: {
+                    Label("Analysis", systemImage: "chart.xyaxis.line")
+                }
+
                 Divider()
 
                 Button("Restore default layout") {
@@ -48,16 +58,6 @@ import SwiftUI
                 }
             } label: {
                 Label("Panels", systemImage: "rectangle.3.group")
-            }
-
-            Menu {
-                ForEach([DockPanel.profiler, .frame]) { panel in
-                    Button(panel.title) {
-                        dock.show(panel)
-                    }
-                }
-            } label: {
-                Label("Analysis", systemImage: "chart.xyaxis.line")
             }
 
             Spacer()
