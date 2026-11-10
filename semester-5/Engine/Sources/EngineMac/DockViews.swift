@@ -96,6 +96,7 @@ import SwiftUI
                 }
             }
             .buttonStyle(.borderless)
+            .frame(height: 32)
             .padding(.horizontal, 8)
             .background(.bar)
 
@@ -145,6 +146,7 @@ import SwiftUI
                     dock.dock(panel, in: panel == .settings ? .right : .bottom)
                 }
             }
+            .frame(height: 32)
             .padding(.horizontal, 10)
             .background(.bar)
 

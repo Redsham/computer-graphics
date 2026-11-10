@@ -1,5 +1,6 @@
 import XCTest
 import AppKit
+import SwiftUI
 import EngineCore
 import Metal
 @testable import EngineMac
@@ -132,6 +133,76 @@ final class DockTests: XCTestCase {
 }
 
 @MainActor final class DockWindowTests: XCTestCase {
+    func testBottomDividerDoesNotChangeToolbarHeight() throws {
+        guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
+            throw XCTSkip("Metal 4 GPU required for EngineSession")
+        }
+
+        _ = NSApplication.shared
+        let name = "GraphicsEngine.DockResizeTests.\(UUID().uuidString)"
+        let session = try EngineSession(
+            defaultsData: JSONEncoder().encode(EngineConfiguration()), settingsName: name, systems: [])
+        session.simulationPaused = true
+        let host = NSHostingView(rootView: EngineView(session: session))
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 1200, height: 800),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        window.orderFront(nil)
+
+        defer {
+            session.diagnosticsDock?.shutdown()
+            session.shutdown()
+            window.contentView = nil
+            window.close()
+            let key = "\(name).Dock.v1"
+            UserDefaults.standard.removeObject(forKey: key)
+            UserDefaults.standard.removeObject(forKey: "NSSplitView Subview Frames " + key + ".horizontal")
+            UserDefaults.standard.removeObject(forKey: "NSSplitView Subview Frames " + key + ".vertical")
+
+            if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first
+            {
+                try? FileManager.default.removeItem(at: support.appending(path: name))
+            }
+        }
+
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.15))
+        let workspace = try XCTUnwrap(session.diagnosticsDock?.workspace)
+        let toolbarHeight = host.bounds.height - workspace.view.bounds.height
+        XCTAssertLessThan(toolbarHeight, 60)
+
+        func consoleTab(in view: NSView) -> DockTabButton? {
+            if let tab = view as? DockTabButton, tab.panel == .console {
+                return tab
+            }
+
+            return view.subviews.lazy.compactMap { consoleTab(in: $0) }.first
+        }
+
+        let tab = try XCTUnwrap(consoleTab(in: workspace.view))
+        let bottom = try XCTUnwrap(workspace.splitView.subviews.last)
+        let tabInset = bottom.bounds.maxY - tab.convert(tab.bounds, to: bottom).maxY
+
+        for height in [800.0, 640.0, 1000.0] {
+            window.setContentSize(NSSize(width: 1200, height: height))
+
+            for topHeight in [260.0, 350.0, 500.0, 280.0] {
+                workspace.splitView.setPosition(topHeight, ofDividerAt: 0)
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+                XCTAssertEqual(
+                    host.bounds.height - workspace.view.bounds.height, toolbarHeight, accuracy: 1,
+                    "Moving the dock divider must resize the viewport instead of the toolbar")
+                let tabFrame = tab.convert(tab.bounds, to: bottom)
+                XCTAssertEqual(
+                    bottom.bounds.maxY - tabFrame.maxY, tabInset, accuracy: 1,
+                    "The dock tab strip must not stretch when the bottom panel grows")
+            }
+        }
+    }
+
     func testFloatingWindowRetainsContentAndOutgoingMountCannotStealIt() throws {
         guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
             throw XCTSkip("Metal 4 GPU required for EngineSession")

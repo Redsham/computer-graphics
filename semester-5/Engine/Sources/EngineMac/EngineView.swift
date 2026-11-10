@@ -80,10 +80,12 @@ import simd
     public var body: some View {
         VStack(spacing: 0) {
             DiagnosticsToolbar(session: session, dock: dock)
+                .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
             DockWorkspace(session: session, dock: dock)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(minWidth: 1000, minHeight: 640)
         .onAppear {
