@@ -73,7 +73,8 @@ import SwiftUI
         item.canCollapse = true
         item.minimumThickness = minimum
         item.maximumThickness = maximum
-        item.holdingPriority = .defaultHigh
+        // Preserve tool sizes during window resizing without blocking divider dragging (priority 490).
+        item.holdingPriority = NSLayoutConstraint.Priority(rawValue: 260)
         items[region] = item
         return item
     }

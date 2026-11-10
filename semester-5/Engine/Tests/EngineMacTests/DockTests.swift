@@ -133,7 +133,7 @@ final class DockTests: XCTestCase {
 }
 
 @MainActor final class DockWindowTests: XCTestCase {
-    func testBottomDividerDoesNotChangeToolbarHeight() throws {
+    func testDockDividersResizePanesWithoutStretchingHeaders() throws {
         guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
             throw XCTSkip("Metal 4 GPU required for EngineSession")
         }
@@ -182,11 +182,12 @@ final class DockTests: XCTestCase {
         }
 
         let tab = try XCTUnwrap(consoleTab(in: workspace.view))
-        let bottom = try XCTUnwrap(workspace.splitView.subviews.last)
+        let bottom = try XCTUnwrap(workspace.splitViewItems.last).viewController.view
         let tabInset = bottom.bounds.maxY - tab.convert(tab.bounds, to: bottom).maxY
 
         for height in [800.0, 640.0, 1000.0] {
             window.setContentSize(NSSize(width: 1200, height: height))
+            var bottomHeights: [CGFloat] = []
 
             for topHeight in [260.0, 350.0, 500.0, 280.0] {
                 workspace.splitView.setPosition(topHeight, ofDividerAt: 0)
@@ -199,7 +200,33 @@ final class DockTests: XCTestCase {
                 XCTAssertEqual(
                     bottom.bounds.maxY - tabFrame.maxY, tabInset, accuracy: 1,
                     "The dock tab strip must not stretch when the bottom panel grows")
+                bottomHeights.append(bottom.bounds.height)
             }
+
+            XCTAssertGreaterThan(
+                (bottomHeights.max() ?? 0) - (bottomHeights.min() ?? 0), 50,
+                "The bottom dock must actually resize when its divider moves")
+        }
+
+        let dock = try XCTUnwrap(session.diagnosticsDock)
+        dock.dock(.profiler, in: .left)
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        let horizontal = try XCTUnwrap(workspace.children.first as? NSSplitViewController)
+
+        for (divider, positions) in [(1, [850.0, 930.0, 870.0]), (0, [280.0, 400.0, 300.0])] {
+            let item = horizontal.splitViewItems[divider == 0 ? 0 : 2]
+            var widths: [CGFloat] = []
+
+            for position in positions {
+                horizontal.splitView.setPosition(position, ofDividerAt: divider)
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.03))
+                widths.append(item.viewController.view.bounds.width)
+            }
+
+            XCTAssertGreaterThan(
+                (widths.max() ?? 0) - (widths.min() ?? 0), 50,
+                "Both side docks must actually resize when their dividers move")
         }
     }
 
