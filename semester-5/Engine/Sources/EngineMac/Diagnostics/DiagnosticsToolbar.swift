@@ -36,15 +36,10 @@ import SwiftUI
 
             Menu {
                 ForEach(DockPanel.allCases) { panel in
-                    Menu(panel.title) {
-                        Button("Show panel") { dock.show(panel) }
-                        DockPanelActions(dock: dock, panel: panel)
+                    Button(panel.title) {
+                        dock.show(panel)
                     }
                 }
-
-                Divider()
-
-                Button("Restore default layout") { dock.reset() }
             } label: {
                 Label("Panels", systemImage: "rectangle.3.group")
             }
