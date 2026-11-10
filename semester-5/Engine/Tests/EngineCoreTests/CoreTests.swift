@@ -123,3 +123,63 @@ import simd
   }
   func stop(world: World) { trace.events.append("stop \(name)") }
 }
+
+extension CoreTests {
+  func testConsoleParsingHistoryAndRegistration() throws {
+    XCTAssertEqual(
+      try ConsoleParser.tokenize("echo \"two words\" '' a\\ b"), ["echo", "two words", "", "a b"])
+    XCTAssertThrowsError(try ConsoleParser.tokenize("echo 'missing"))
+    let commands = ConsoleCommands()
+    commands.register("echo", help: "Print text") { $0.joined(separator: " ") }
+    XCTAssertEqual(try commands.execute("echo hello"), "hello")
+    XCTAssertEqual(commands.completions("ec"), ["echo"])
+    XCTAssertTrue(commands.help.contains("Print text"))
+    XCTAssertThrowsError(try commands.execute("unknown"))
+    for index in 0..<220 { _ = try commands.execute("echo \(index)") }
+    XCTAssertEqual(commands.history.count, 200)
+  }
+  func testBoundedStructuredLogFilteringExportAndRotation() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let log = try EngineLog(
+      capacity: 3, fileURL: directory.appending(path: "engine.jsonl"), fileLimit: 1024)
+    for index in 0..<8 {
+      log.write(
+        index.isMultiple(of: 2) ? .info : .warning, category: "Test",
+        "\(index) " + String(repeating: "x", count: 700))
+    }
+    XCTAssertNil(log.flush())
+    XCTAssertEqual(log.entries.count, 3)
+    XCTAssertEqual(log.filtered(minimum: .warning).count, 2)
+    XCTAssertEqual(log.filtered(search: "Test").count, 3)
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: directory.appending(path: "engine.jsonl.1").path))
+    let exported = try JSONSerialization.jsonObject(with: log.exportJSON()) as? [[String: Any]]
+    XCTAssertEqual(exported?.count, 3)
+    log.clear()
+    XCTAssertTrue(log.entries.isEmpty)
+  }
+  func testProfileHistoryBoundsAndDelayedGPUResults() {
+    let history = ProfileHistory(capacity: 3)
+    for id in 0..<5 { history.append(FrameProfile(id: UInt64(id), cpuMilliseconds: Double(id))) }
+    XCTAssertEqual(history.frames.map(\.id), [2, 3, 4])
+    history.updateGPU(frameID: 3, total: 0.5, passes: [TimingSample("Forward", milliseconds: 0.3)])
+    XCTAssertEqual(history.frames[1].gpuMilliseconds, 0.5)
+    history.updateCPU(frameID: 3, total: 7, systems: [TimingSample("Camera", milliseconds: 0.1)])
+    XCTAssertEqual(history.frames[1].cpuMilliseconds, 7)
+    XCTAssertEqual(history.percentile(1), 7)
+    history.updateGPU(frameID: 0, total: 100, passes: [])
+    XCTAssertEqual(history.frames.count, 3)
+  }
+}
+
+extension CoreTests {
+  func testPortableHalfFloatDecodingIncludesSpecialValues() {
+    XCTAssertEqual(BinaryScalar.float16(0x3c00), 1)
+    XCTAssertEqual(BinaryScalar.float16(0xbc00), -1)
+    XCTAssertEqual(BinaryScalar.float16(0x0001), pow(2, -24), accuracy: 1e-12)
+    XCTAssertEqual(BinaryScalar.float16(0x8000).sign, .minus)
+    XCTAssertEqual(BinaryScalar.float16(0x7c00), .infinity)
+    XCTAssertTrue(BinaryScalar.float16(0x7e00).isNaN)
+  }
+}

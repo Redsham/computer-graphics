@@ -9,6 +9,18 @@ import os
 @MainActor public final class EngineSession: NSObject, ObservableObject, MTKViewDelegate {
   public let world = World()
   public let renderer: MetalRenderer
+  public let log: EngineLog
+  public let commands = ConsoleCommands()
+  @Published public var diagnosticsVisible = true
+  @Published public var diagnosticsTab = "Console"
+  @Published public internal(set) var logEntries: [LogEntry] = []
+  @Published public internal(set) var profileFrames: [FrameProfile] = []
+  @Published public internal(set) var capturedFrame: FrameCapture?
+  @Published public internal(set) var simulationPaused = false
+  @Published public internal(set) var stepRequested = false
+  public var viewportPaused: Bool { isRenderingPaused || (simulationPaused && !stepRequested) }
+  var logRevision: UInt64 = .max
+  private var diagnosticsTime: Double = 0
   @Published public var configuration: EngineConfiguration
   @Published public private(set) var message: String?
   @Published public private(set) var fps: Double = 0
@@ -18,7 +30,7 @@ import os
   private let store: ConfigurationStore
   private let scheduler: SystemScheduler
   private let frame = FrameContext()
-  private var clock = FrameClock()
+  var clock = FrameClock()
   private var applied: EngineConfiguration
   private var statsStart = CACurrentMediaTime()
   private var statsFrames = 0
@@ -28,7 +40,7 @@ import os
   private let logger = Logger(subsystem: "GraphicsEngine", category: "Application")
   public init(
     defaultsData: Data, settingsName: String, systems: [any EngineSystem],
-    passes: [any RenderPass] = [ForwardPass(), OutputPass()]
+    passes: [any RenderPass] = [ForwardPass(), OutputPass()], enableShaderLogging: Bool = false
   ) throws {
     let support = try FileManager.default.url(
       for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
@@ -39,14 +51,20 @@ import os
     configuration = result.configuration
     applied = result.configuration
     message = result.warning
-    renderer = try MetalRenderer(passes: passes)
+    let log = try EngineLog(
+      fileURL: support.appending(path: settingsName).appending(path: "Logs/engine.jsonl"))
+    self.log = log
+    renderer = try MetalRenderer(passes: passes, log: log, enableShaderLogging: enableShaderLogging)
     scheduler = SystemScheduler(systems: systems)
     super.init()
     renderer.onError = { [weak self] message in
       self?.isRenderingPaused = true
       self?.report(message)
     }
-    if let warning = result.warning { logger.warning("\(warning, privacy: .public)") }
+    configureCommands()
+    if let warning = result.warning { log.write(.warning, category: "Settings", warning) }
+    log.write(category: "Application", "Session ready. Type help for commands.")
+    refreshDiagnostics()
   }
   public func resetSettings() {
     configuration = store.defaults
@@ -58,9 +76,13 @@ import os
     frame.aspectRatio = Float(size.width / max(size.height, 1))
   }
   public func draw(in view: MTKView) {
-    guard !stopped, !isRenderingPaused, let view = view as? EngineMetalView else { return }
+    // MTKView can deliver an already queued draw after isPaused changes.
+    guard !stopped, !isRenderingPaused, !simulationPaused || stepRequested,
+      let view = view as? EngineMetalView
+    else { return }
     let start = CACurrentMediaTime()
-    frame.deltaTime = clock.tick(at: start)
+    frame.deltaTime =
+      simulationPaused && stepRequested ? 1 / Float(configuration.targetFPS) : clock.tick(at: start)
     guard view.drawableSize.width > 0, view.drawableSize.height > 0,
       let drawable = view.currentDrawable
     else { return }
@@ -70,14 +92,31 @@ import os
       frame.aspectRatio = Float(view.drawableSize.width / max(view.drawableSize.height, 1))
       frame.input = view.input.snapshot()
       scheduler.update(world: world, frame: frame)
+      let capturing = renderer.captureRequested
       try renderer.render(
         snapshot: frame.snapshot, configuration: next, surface: drawable.texture, drawable: drawable
       )
+      renderer.profiles.updateCPU(
+        frameID: renderer.lastSubmittedFrameID, total: (CACurrentMediaTime() - start) * 1000,
+        systems: scheduler.lastTimings)
+      if capturing {
+        capturedFrame = renderer.lastCapture
+        simulationPaused = true
+        diagnosticsTab = "Frame"
+        diagnosticsVisible = true
+      }
+      if stepRequested { stepRequested = false }
+      view.isPaused = viewportPaused
+      if start - diagnosticsTime > 0.2 || capturing || simulationPaused {
+        diagnosticsTime = start
+        refreshDiagnostics()
+      }
       view.preferredFramesPerSecond = next.targetFPS
       if next != applied || needsSave {
         try store.save(next)
         applied = next
         needsSave = false
+        log.write(.debug, category: "Settings", "Configuration applied and saved.")
       }
       statsFrames += 1
       statsCPU += CACurrentMediaTime() - start
@@ -113,9 +152,12 @@ import os
     stopped = true
     scheduler.stop(world: world)
     do { try renderer.waitUntilIdle() } catch { report(error.localizedDescription) }
+    log.write(category: "Application", "Session stopped.")
+    if let error = log.flush() { logger.error("Log file: \(error, privacy: .public)") }
   }
-  private func report(_ message: String) {
-    logger.error("\(message, privacy: .public)")
+  func report(_ message: String) {
+    log.write(.error, category: "Application", message)
+    refreshDiagnostics()
     if self.message != message { self.message = message }
   }
 }

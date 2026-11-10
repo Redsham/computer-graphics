@@ -17,10 +17,14 @@ public struct MeshVertex: Sendable {
     public let count: Int
   }
   private let device: any MTLDevice
+  private let log: EngineLog?
   private var nextID: UInt64 = 0
   private var meshes: [MeshID: Mesh] = [:]
   private var materials: [MaterialID: Material] = [:]
-  init(device: any MTLDevice) { self.device = device }
+  init(device: any MTLDevice, log: EngineLog? = nil) {
+    self.device = device
+    self.log = log
+  }
   public func makeMesh(vertices: [MeshVertex]) throws -> MeshID {
     guard !vertices.isEmpty, vertices.count.isMultiple(of: 3) else {
       throw EngineError.unavailable("Triangle mesh requires a nonempty multiple of three vertices.")
@@ -37,6 +41,9 @@ public struct MeshVertex: Sendable {
     let id = MeshID(nextID)
     buffer.label = "Mesh.\(nextID)"
     meshes[id] = Mesh(buffer: buffer, count: data.count)
+    log?.write(
+      .debug, category: "Resources",
+      "Created mesh \(id.rawValue): \(data.count) vertices, \(buffer.length) bytes.")
     return id
   }
   public func makeMaterial(_ material: Material) -> MaterialID {
@@ -58,7 +65,10 @@ public struct MeshVertex: Sendable {
     return material
   }
   /// Submitted frames retain mesh buffers until GPU completion.
-  public func removeMesh(_ id: MeshID) { meshes.removeValue(forKey: id) }
+  public func removeMesh(_ id: MeshID) {
+    meshes.removeValue(forKey: id)
+    log?.write(.debug, category: "Resources", "Released mesh \(id.rawValue).")
+  }
   public func removeMaterial(_ id: MaterialID) { materials.removeValue(forKey: id) }
   public func makeCube() throws -> MeshID {
     let faces: [(SIMD3<Float>, [SIMD3<Float>])] = [
@@ -79,12 +89,32 @@ public struct MeshVertex: Sendable {
 @MainActor public final class FrameResources {
   public let index: Int
   let allocator: any MTL4CommandAllocator
-  let commands: any MTL4CommandBuffer
+  var commands: any MTL4CommandBuffer
   public let forwardArguments: any MTL4ArgumentTable
   public let outputArguments: any MTL4ArgumentTable
   let uniforms: any MTLBuffer
   var objects: any MTLBuffer
   var capacity = 256
+  public internal(set) var isCapturing = false
+  var debugBuffers: [String: InspectableBuffer] = [:]
+  var debugTextures: [String: any MTLTexture] = [:]
+  var counters: (any MTL4CounterHeap)?
+  var pendingProfile: (id: UInt64, names: [String])?
+  var drawCount = 0
+  /// Expose custom pass resources to the debugger. Register before GPU submission.
+  public func inspectBuffer(
+    _ name: String, buffer: any MTLBuffer, range: Range<Int>? = nil, stride: Int? = nil,
+    schema: String? = nil
+  ) {
+    let range = range ?? 0..<buffer.length
+    guard range.lowerBound >= 0, range.upperBound <= buffer.length else { return }
+    debugBuffers[name] = InspectableBuffer(
+      buffer: buffer, range: range, stride: stride, schema: schema)
+  }
+  public func inspectTexture(_ name: String, texture: any MTLTexture) {
+    debugTextures[name] = texture
+  }
+
   let residency: any MTLResidencySet
   var completionValue: UInt64 = 0
   var targets: [String: any MTLTexture] = [:]
@@ -119,6 +149,17 @@ public struct MeshVertex: Sendable {
   public func useResource(_ allocation: any MTLAllocation) {
     residency.addAllocation(allocation)
     retained.append(allocation)
+    if !isCapturing { return }
+    if let buffer = allocation as? any MTLBuffer,
+      !debugBuffers.values.contains(where: {
+        ObjectIdentifier($0.buffer) == ObjectIdentifier(buffer)
+      })
+    {
+      inspectBuffer(buffer.label ?? "Buffer.\(debugBuffers.count)", buffer: buffer)
+    }
+    if let texture = allocation as? any MTLTexture {
+      inspectTexture(texture.label ?? "Texture.\(debugTextures.count)", texture: texture)
+    }
   }
   func upload(
     snapshot: RenderSnapshot, configuration: EngineConfiguration, resources: ResourceStore,

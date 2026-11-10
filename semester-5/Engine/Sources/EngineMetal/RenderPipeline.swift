@@ -76,6 +76,7 @@ public enum PipelineValidation {
     }
     return texture
   }
+  public func recordDraw(count: Int = 1) { frame.drawCount += max(0, count) }
   public func retain(_ resource: AnyObject) { frame.retained.append(resource) }
   /// Every pass starts after prior GPU accesses. Conservative and correct for custom passes.
   public func synchronize(_ encoder: any MTL4CommandEncoder) {

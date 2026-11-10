@@ -40,7 +40,8 @@ import Metal
     if context.configuration.sampleCount > 1 {
       color.texture = try context.texture("msaaHDR")
       color.resolveTexture = hdr
-      color.storeAction = .multisampleResolve
+      color.storeAction =
+        context.frame.isCapturing ? .storeAndMultisampleResolve : .multisampleResolve
     } else {
       color.texture = hdr
       color.storeAction = .store
@@ -73,6 +74,7 @@ import Metal
       let mesh = try context.resources.mesh(object.mesh)
       table.setAddress(mesh.buffer.gpuAddress, index: Int(GPUVertexBinding))
       encoder.setArgumentTable(table, stages: [.vertex, .fragment])
+      context.recordDraw()
       encoder.drawPrimitives(
         primitiveType: .triangle, vertexStart: 0, vertexCount: mesh.count, instanceCount: 1,
         baseInstance: index)
@@ -108,6 +110,7 @@ import Metal
     table.setAddress(context.frame.uniforms.gpuAddress, index: Int(GPUFrameBinding))
     table.setTexture(try context.texture("hdr").gpuResourceID, index: Int(GPUColorTexture))
     encoder.setArgumentTable(table, stages: [.vertex, .fragment])
+    context.recordDraw()
     encoder.drawPrimitives(primitiveType: .triangle, vertexStart: 0, vertexCount: 3)
     context.retain(state)
   }

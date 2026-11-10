@@ -32,3 +32,17 @@ fragment float4 outputFragment(ScreenOutput in [[stage_in]], texture2d<float, ac
     // The sRGB render target performs the linear-to-sRGB conversion.
     return float4(mapped, 1);
 }
+
+// Each sample is preserved in its own plane, rather than silently resolving MSAA.
+kernel void debugColorMS(texture2d_ms<float, access::read> source [[texture(0)]],
+                         device float4 *output [[buffer(0)]], uint3 p [[thread_position_in_grid]]) {
+    if (p.x < source.get_width() && p.y < source.get_height() && p.z < source.get_num_samples())
+        output[(p.z * source.get_height() + p.y) * source.get_width() + p.x] = source.read(p.xy, p.z);
+}
+kernel void debugDepthMS(depth2d_ms<float, access::read> source [[texture(0)]],
+                         device float4 *output [[buffer(0)]], uint3 p [[thread_position_in_grid]]) {
+    if (p.x < source.get_width() && p.y < source.get_height() && p.z < source.get_num_samples()) {
+        float depth = source.read(p.xy, p.z);
+        output[(p.z * source.get_height() + p.y) * source.get_width() + p.x] = float4(depth, depth, depth, 1);
+    }
+}

@@ -1,3 +1,4 @@
+import Foundation
 import simd
 
 @MainActor public final class FrameContext {
@@ -20,6 +21,7 @@ extension EngineSystem {
 @MainActor public final class SystemScheduler {
   private let systems: [any EngineSystem]
   private var started = false
+  public private(set) var lastTimings: [TimingSample] = []
   public init(systems: [any EngineSystem]) { self.systems = systems }
   public func start(world: World) {
     guard !started else { return }
@@ -29,7 +31,13 @@ extension EngineSystem {
   public func update(world: World, frame: FrameContext) {
     start(world: world)
     world.beginUpdate()
-    for system in systems { system.update(world: world, frame: frame) }
+    lastTimings = systems.enumerated().map { index, system in
+      let start = ProcessInfo.processInfo.systemUptime
+      system.update(world: world, frame: frame)
+      return TimingSample(
+        "\(index + 1). \(String(describing: type(of: system)))",
+        milliseconds: (ProcessInfo.processInfo.systemUptime - start) * 1000)
+    }
     world.endUpdate()
   }
   public func stop(world: World) {

@@ -4,19 +4,19 @@ import SwiftUI
 import simd
 
 @MainActor private struct MetalViewport: NSViewRepresentable {
-  let session: EngineSession
+  @ObservedObject var session: EngineSession
   func makeNSView(context: Context) -> MTKView {
     let view = EngineMetalView(frame: .zero, device: session.renderer.metal.device)
     view.colorPixelFormat = .bgra8Unorm_srgb
     view.depthStencilPixelFormat = .invalid
     view.sampleCount = 1
-    view.framebufferOnly = true
+    view.framebufferOnly = false
     view.preferredFramesPerSecond = session.configuration.targetFPS
     view.delegate = session
     return view
   }
   func updateNSView(_ view: MTKView, context: Context) {
-    view.isPaused = session.isRenderingPaused
+    view.isPaused = session.viewportPaused
   }
   static func dismantleNSView(_ view: MTKView, coordinator: ()) {
     view.isPaused = true
@@ -28,53 +28,69 @@ import simd
   @ObservedObject private var session: EngineSession
   public init(session: EngineSession) { self.session = session }
   public var body: some View {
-    HStack(spacing: 0) {
-      ZStack(alignment: .topLeading) {
-        MetalViewport(session: session)
-        VStack(alignment: .leading, spacing: 5) {
-          Text("METAL 4").font(.caption.bold()).foregroundStyle(.mint)
-          Text(
-            String(
-              format: "%.0f FPS · CPU %.2f ms · objects: %d", session.fps, session.cpuMilliseconds,
-              session.objectCount)
-          )
-          .font(.system(.caption, design: .monospaced))
-          Text("WASD · Q/E · Right-drag to look").font(.caption).foregroundStyle(.secondary)
-        }
-        .padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)).padding()
-      }
+    VStack(spacing: 0) {
+      DiagnosticsToolbar(session: session)
       Divider()
-      ScrollView {
-        VStack(alignment: .leading, spacing: 18) {
-          Text("Renderer").font(.title2.bold())
-          Text("Engine Sandbox").foregroundStyle(.secondary)
-          Divider()
-          Picker("Target FPS", selection: $session.configuration.targetFPS) {
-            ForEach([30, 60, 120, 144, 240], id: \.self) { Text("\($0)").tag($0) }
+      HStack(spacing: 0) {
+        ZStack(alignment: .topLeading) {
+          MetalViewport(session: session)
+          VStack(alignment: .leading, spacing: 5) {
+            Text("METAL 4").font(.caption.bold()).foregroundStyle(.mint)
+            Text(
+              session.simulationPaused
+                ? String(
+                  format: "Paused · CPU %.2f ms · objects: %d", session.cpuMilliseconds,
+                  session.objectCount)
+                : String(
+                  format: "%.0f FPS · CPU %.2f ms · objects: %d", session.fps,
+                  session.cpuMilliseconds, session.objectCount)
+            )
+            .font(.system(.caption, design: .monospaced))
+            Text("WASD · Q/E · Right-drag to look").font(.caption).foregroundStyle(.secondary)
           }
-          Picker("MSAA", selection: $session.configuration.sampleCount) {
-            Text("1×").tag(1)
-            Text("4×").tag(4)
-          }.pickerStyle(.segmented)
-          Toggle("Wireframe", isOn: $session.configuration.wireframe)
-          ColorPicker("Background", selection: background, supportsOpacity: false)
-          setting("Exposure", value: $session.configuration.exposure, range: 0.1...8)
-          Divider()
-          Text("Camera").font(.headline)
-          setting("Field of view", value: $session.configuration.fieldOfView, range: 20...110)
-          setting("Movement speed", value: $session.configuration.cameraSpeed, range: 0.1...20)
-          Button("Restore defaults") { session.resetSettings() }
-          if let message = session.message {
+          .padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+          .padding()
+        }
+        Divider()
+        ScrollView {
+          VStack(alignment: .leading, spacing: 18) {
+            Text("Renderer").font(.title2.bold())
+            Text("Engine Sandbox").foregroundStyle(.secondary)
             Divider()
-            Text(message).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
-            if session.isRenderingPaused { Button("Retry rendering") { session.retry() } }
-            Button("Dismiss") { session.clearMessage() }
-          }
-          Spacer(minLength: 0)
-        }.padding(20)
-      }.frame(width: 280)
+            Picker("Target FPS", selection: $session.configuration.targetFPS) {
+              ForEach(
+                Array(Set([30, 60, 120, 144, 240, session.configuration.targetFPS])).sorted(),
+                id: \.self
+              ) { Text("\($0)").tag($0) }
+            }
+            Picker("MSAA", selection: $session.configuration.sampleCount) {
+              Text("1×").tag(1)
+              Text("4×").tag(4)
+            }.pickerStyle(.segmented)
+            Toggle("Wireframe", isOn: $session.configuration.wireframe)
+            ColorPicker("Background", selection: background, supportsOpacity: false)
+            setting("Exposure", value: $session.configuration.exposure, range: 0.1...8)
+            Divider()
+            Text("Camera").font(.headline)
+            setting("Field of view", value: $session.configuration.fieldOfView, range: 20...110)
+            setting("Movement speed", value: $session.configuration.cameraSpeed, range: 0.1...20)
+            Button("Restore defaults") { session.resetSettings() }
+            if let message = session.message {
+              Divider()
+              Text(message).font(.caption).foregroundStyle(.orange).textSelection(.enabled)
+              if session.isRenderingPaused { Button("Retry rendering") { session.retry() } }
+              Button("Dismiss") { session.clearMessage() }
+            }
+            Spacer(minLength: 0)
+          }.padding(20)
+        }.frame(width: 280)
+      }
+      if session.diagnosticsVisible {
+        Divider()
+        DiagnosticsPanel(session: session).frame(height: 340)
+      }
     }
-    .frame(minWidth: 900, minHeight: 560)
+    .frame(minWidth: 1100, minHeight: 800)
     .onAppear { session.activate() }
     .onDisappear { session.shutdown() }
   }
