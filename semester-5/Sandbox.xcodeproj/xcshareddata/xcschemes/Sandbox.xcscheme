@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="2660" version="1.3">
+ <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES"><BuildActionEntries>
+  <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="4F6027D858B72CC70E5CC8E9" BuildableName="Sandbox.app" BlueprintName="Sandbox" ReferencedContainer="container:Sandbox.xcodeproj"/></BuildActionEntry>
+  <BuildActionEntry buildForTesting="YES" buildForRunning="NO" buildForProfiling="NO" buildForArchiving="NO" buildForAnalyzing="YES"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="0A06C5E2DA34E686D888A695" BuildableName="SandboxTests.xctest" BlueprintName="SandboxTests" ReferencedContainer="container:Sandbox.xcodeproj"/></BuildActionEntry>
+ </BuildActionEntries></BuildAction>
+ <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"><Testables><TestableReference skipped="NO" parallelizable="NO"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="0A06C5E2DA34E686D888A695" BuildableName="SandboxTests.xctest" BlueprintName="SandboxTests" ReferencedContainer="container:Sandbox.xcodeproj"/></TestableReference></Testables></TestAction>
+ <LaunchAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.IDEFoundation.Launcher.LLDB" launchStyle="0" useCustomWorkingDirectory="NO" ignoresPersistentStateOnLaunch="NO" debugDocumentVersioning="YES" debugServiceExtension="internal" allowLocationSimulation="YES">
+  <BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="4F6027D858B72CC70E5CC8E9" BuildableName="Sandbox.app" BlueprintName="Sandbox" ReferencedContainer="container:Sandbox.xcodeproj"/></BuildableProductRunnable>
+  <EnvironmentVariables><EnvironmentVariable key="MTL_DEBUG_LAYER" value="1" isEnabled="YES"/></EnvironmentVariables>
+ </LaunchAction>
+ <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES"><BuildableProductRunnable runnableDebuggingMode="0"><BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="4F6027D858B72CC70E5CC8E9" BuildableName="Sandbox.app" BlueprintName="Sandbox" ReferencedContainer="container:Sandbox.xcodeproj"/></BuildableProductRunnable></ProfileAction>
+ <AnalyzeAction buildConfiguration="Debug"/><ArchiveAction buildConfiguration="Release" revealArchiveInOrganizer="YES"/>
+</Scheme>

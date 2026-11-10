@@ -1,0 +1,9 @@
+{
+  "targetFPS": 60,
+  "sampleCount": 1,
+  "wireframe": false,
+  "background": [0.025, 0.035, 0.055],
+  "exposure": 1,
+  "fieldOfView": 60,
+  "cameraSpeed": 3
+}
