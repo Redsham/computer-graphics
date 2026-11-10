@@ -19,5 +19,7 @@ let package = Package(
         .testTarget(name: "EngineCoreTests", dependencies: ["EngineCore"]),
         .testTarget(name: "EngineMetalTests", dependencies: ["EngineCore", "EngineMetal"]),
         .testTarget(name: "EngineMacTests", dependencies: ["EngineMac"]),
+        .executableTarget(
+            name: "EngineBenchmarks", dependencies: ["EngineCore"], path: "Benchmarks"),
     ]
 )

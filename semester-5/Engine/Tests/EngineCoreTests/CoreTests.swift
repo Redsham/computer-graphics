@@ -209,6 +209,78 @@ extension CoreTests {
 }
 
 extension CoreTests {
+    func testCachedQueriesInvalidateOnlyForStructuralChangesAndKeepSnapshotsStable() {
+        let world = World()
+        let first = world.create()
+        world.set(Camera(), for: first)
+        let frozen = world.entities(with: Camera.self)
+        XCTAssertEqual(world.entities(with: Camera.self), frozen)
+        world.set(Camera(), for: first)
+        XCTAssertEqual(world.entities(with: Camera.self), frozen)
+
+        let second = world.create()
+        world.set(Camera(), for: second)
+        XCTAssertEqual(world.entities(with: Camera.self), [first, second])
+        XCTAssertEqual(frozen, [first])
+        world.remove(Camera.self, from: first)
+        XCTAssertEqual(world.entities(with: Camera.self), [second])
+        world.destroy(second)
+        XCTAssertTrue(world.entities(with: Camera.self).isEmpty)
+        let recycled = world.create()
+        world.set(Camera(), for: recycled)
+        XCTAssertEqual(world.entities(with: Camera.self), [recycled])
+        XCTAssertNotEqual(recycled, second)
+    }
+
+    func testDeferredInsertionInvalidatesPreviouslyCachedQuery() {
+        let world = World()
+        let entity = world.create()
+        let trace = Trace()
+        let scheduler = SystemScheduler(systems: [Probe("Insert", trace: trace, entity: entity)])
+        XCTAssertTrue(world.entities(with: Camera.self).isEmpty)
+        scheduler.update(world: world, frame: FrameContext())
+        XCTAssertEqual(world.entities(with: Camera.self), [entity])
+        XCTAssertEqual(trace.observed, [false])
+        scheduler.stop(world: world)
+    }
+
+    func testProfileHistoryWraparoundUpdatesClearAndFrozenSnapshots() {
+        let history = ProfileHistory(capacity: 1)
+        history.append(FrameProfile(id: 1, cpuMilliseconds: 1))
+        let frozen = history.frames
+        history.append(FrameProfile(id: 2, cpuMilliseconds: 2))
+        let revision = history.revision
+        history.updateGPU(frameID: 1, total: 99, passes: [])
+        XCTAssertEqual(history.revision, revision)
+        history.updateGPU(frameID: 2, total: 0.5, passes: [])
+        history.updateCPU(frameID: 2, total: 3, systems: [])
+        XCTAssertEqual(history.frames.count, 1)
+        XCTAssertEqual(history.frames[0].gpuMilliseconds, 0.5)
+        XCTAssertEqual(history.frames[0].cpuMilliseconds, 3)
+        XCTAssertEqual(frozen[0].id, 1)
+        XCTAssertEqual(frozen[0].cpuMilliseconds, 1)
+        history.clear()
+        XCTAssertTrue(history.frames.isEmpty)
+        history.append(FrameProfile(id: 3))
+        XCTAssertEqual(history.frames.map(\.id), [3])
+        XCTAssertGreaterThan(history.revision, revision)
+    }
+
+    func testLogWraparoundPreservesChronologyAndExportAfterClear() throws {
+        let log = try EngineLog(capacity: 2)
+        for index in 0..<5 {
+            log.write(category: "Ring", "\(index)")
+        }
+        let frozen = log.entries
+        XCTAssertEqual(frozen.map(\.message), ["3", "4"])
+        log.clear()
+        log.write(category: "Ring", "next")
+        XCTAssertEqual(log.entries.map(\.message), ["next"])
+        XCTAssertEqual(frozen.map(\.message), ["3", "4"])
+        let decoded = try JSONDecoder.isoDates.decode([LogEntry].self, from: log.exportJSON())
+        XCTAssertEqual(decoded.map(\.message), ["next"])
+    }
+
     func testPortableHalfFloatDecodingIncludesSpecialValues() {
         XCTAssertEqual(BinaryScalar.float16(0x3c00), 1)
         XCTAssertEqual(BinaryScalar.float16(0xbc00), -1)
@@ -216,5 +288,13 @@ extension CoreTests {
         XCTAssertEqual(BinaryScalar.float16(0x8000).sign, .minus)
         XCTAssertEqual(BinaryScalar.float16(0x7c00), .infinity)
         XCTAssertTrue(BinaryScalar.float16(0x7e00).isNaN)
+    }
+}
+
+private extension JSONDecoder {
+    static var isoDates: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }

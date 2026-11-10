@@ -1,0 +1,31 @@
+{
+  "date" : "2026-11-10T14:58:55Z",
+  "operatingSystem" : "Version 26.5.2 (Build 25F84)",
+  "processors" : 10,
+  "samples" : [
+    {
+      "checksum" : 70000000,
+      "iterations" : 1000,
+      "maximumMilliseconds" : 7109.991666,
+      "medianMilliseconds" : 6789.561625,
+      "minimumMilliseconds" : 6721.023625,
+      "name" : "stable-component-queries-10000"
+    },
+    {
+      "checksum" : 2100,
+      "iterations" : 100000,
+      "maximumMilliseconds" : 27.246542,
+      "medianMilliseconds" : 26.931416,
+      "minimumMilliseconds" : 26.86675,
+      "name" : "profile-history-append-300"
+    },
+    {
+      "checksum" : 7000,
+      "iterations" : 100,
+      "maximumMilliseconds" : 392.20675,
+      "medianMilliseconds" : 263.521667,
+      "minimumMilliseconds" : 260.513042,
+      "name" : "scene-update-1000-objects"
+    }
+  ]
+}

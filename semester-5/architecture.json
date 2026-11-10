@@ -1,0 +1,15 @@
+{
+  "targets": {
+    "GPUShared": {"dependencies": [], "imports": [], "path": "Engine/Sources/GPUShared"},
+    "EngineCore": {"dependencies": [], "imports": ["Foundation", "os", "simd"], "path": "Engine/Sources/EngineCore"},
+    "EngineMetal": {"dependencies": ["EngineCore", "GPUShared"], "imports": ["Foundation", "Metal", "QuartzCore", "simd"], "path": "Engine/Sources/EngineMetal"},
+    "EngineMac": {"dependencies": ["EngineCore", "EngineMetal"], "imports": ["AppKit", "Charts", "Combine", "Foundation", "Metal", "MetalKit", "QuartzCore", "SwiftUI", "UniformTypeIdentifiers", "os", "simd"], "path": "Engine/Sources/EngineMac"},
+    "EngineCoreTests": {"dependencies": ["EngineCore"], "imports": ["Foundation", "XCTest", "simd"], "path": "Engine/Tests/EngineCoreTests"},
+    "EngineMetalTests": {"dependencies": ["EngineCore", "EngineMetal"], "imports": ["Foundation", "Metal", "XCTest", "simd"], "path": "Engine/Tests/EngineMetalTests"},
+    "EngineMacTests": {"dependencies": ["EngineMac"], "imports": ["AppKit", "EngineCore", "Metal", "SwiftUI", "XCTest"], "path": "Engine/Tests/EngineMacTests"},
+    "EngineBenchmarks": {"dependencies": ["EngineCore"], "imports": ["Foundation"], "path": "Engine/Benchmarks"}
+  },
+  "applications": {
+    "Sandbox": {"dependencies": ["EngineCore", "EngineMac"], "imports": ["SwiftUI"], "path": "Sandbox", "project": "Sandbox.xcodeproj/project.pbxproj"}
+  }
+}

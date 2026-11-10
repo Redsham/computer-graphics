@@ -39,7 +39,7 @@ Console; если Console была скрыта, объединённая пан
 
 Код dock изолирован в EngineMac: `DockLayout` проверяет раскладку и переходы,
 `DiagnosticsDock` управляет окнами и хранением, `DockWorkspaceController` — разделителями и drop-зонами,
-`DockViews` — вкладками и переносом постоянных контейнеров. EngineCore и EngineMetal от dock не зависят.
+`DockPanels` и `DockTab` — вкладками, `DockPanelHost` — переносом постоянных контейнеров. EngineCore и EngineMetal от dock не зависят.
 
 ## Console
 

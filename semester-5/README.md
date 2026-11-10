@@ -7,6 +7,12 @@
 Панели и настройки Renderer поддерживают dock с вкладками слева, справа и снизу,
 перетаскивание в отдельные окна, изменение размеров и сохранение раскладки.
 
+Разработка: [правила](../AGENTS.md), [границы модулей и расширение](docs/ARCHITECTURE.md),
+[производительность и воспроизводимые замеры](docs/PERFORMANCE.md),
+[Metal и графические техники](docs/METAL_RESEARCH.md).
+Проверка зависимостей: `python3 scripts/check-architecture.py` из корня репозитория;
+полная проверка движка: `./scripts/check-engine.sh`.
+
 ## Запуск
 
 Откройте `GraphicsEngine.xcworkspace`, выберите схему **Sandbox**, устройство **My Mac** и нажмите Run.
@@ -47,7 +53,8 @@ semester-5/
     │   └── GPUShared/         # Общий ABI Swift/C/Metal
     └── Tests/
         ├── EngineCoreTests/
-        └── EngineMetalTests/
+        ├── EngineMetalTests/
+        └── EngineMacTests/
 ```
 
 Зависимости проверяются границами targets:

@@ -29,6 +29,12 @@ semester-5/
 
 Для запуска движка 5-го семестра откройте `semester-5/GraphicsEngine.xcworkspace` и выберите схему `Sandbox`. Требования и устройство движка описаны в [README 5-го семестра](semester-5/README.md).
 
+Правила изменений и согласования существующих модулей — [AGENTS.md](AGENTS.md).
+Для движка ведутся [описание архитектуры](semester-5/docs/ARCHITECTURE.md),
+[замеры производительности](semester-5/docs/PERFORMANCE.md) и
+[исследования Metal и графических техник](semester-5/docs/METAL_RESEARCH.md).
+Полная локальная проверка: `./scripts/check-engine.sh`.
+
 ## Стиль кода
 
 Во всех исходниках используются четыре пробела для отступа и ширина строки 110 символов.

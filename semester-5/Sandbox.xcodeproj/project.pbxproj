@@ -1,5 +1,7 @@
 // !$*UTF8*$!
 { archiveVersion = 1; classes = {}; objectVersion = 60; objects = {
+A20000000000000000000001 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SandboxScene.swift"; sourceTree = "<group>"; };
+A20000000000000000000002 = { isa = PBXBuildFile; fileRef = A20000000000000000000001; };
 A10000000000000000000001 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Engine/Tests/EngineMacTests/DockTests.swift"; sourceTree = "<group>"; };
 A10000000000000000000002 = { isa = PBXBuildFile; fileRef = A10000000000000000000001; };
 A10000000000000000000003 = { isa = XCSwiftPackageProductDependency; productName = EngineMac; package = 582681C2EAE02B3F3D399C0C; };
@@ -10,7 +12,7 @@ A10000000000000000000004 = { isa = PBXBuildFile; productRef = A10000000000000000
 F05F239F2DCBC9DBD8E5B000 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Engine/Tests/EngineMetalTests/MetalTests.swift"; sourceTree = "<group>"; };
 8BCD5BC4CDFDF0918087C782 = { isa = PBXFileReference; explicitFileType = wrapper.application; path = Sandbox.app; sourceTree = BUILT_PRODUCTS_DIR; };
 F219C0274590DA45E4BEF1EA = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = SandboxTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; children = (905DB04043B7311D06A28734, 05D97E6E9834CCF063C552E4,); path = Sandbox; sourceTree = "<group>"; };
+3A2A88DEEFF3D1D23E496597 = { isa = PBXGroup; children = (905DB04043B7311D06A28734, A20000000000000000000001, 05D97E6E9834CCF063C552E4,); path = Sandbox; sourceTree = "<group>"; };
 8B7A6DECC0651D269EA794C7 = { isa = PBXGroup; children = (473BCAC3AF23D88832D1BB08, F05F239F2DCBC9DBD8E5B000, A10000000000000000000001,); name = Tests; sourceTree = "<group>"; };
 FBDC4F23F93125BBEEAE800C = { isa = PBXGroup; children = (8BCD5BC4CDFDF0918087C782, F219C0274590DA45E4BEF1EA,); name = Products; sourceTree = "<group>"; };
 DC76E9F0C0006E8F919E0C51 = { isa = PBXGroup; children = (3A2A88DEEFF3D1D23E496597, 8B7A6DECC0651D269EA794C7, FBDC4F23F93125BBEEAE800C,); sourceTree = "<group>"; };
@@ -27,7 +29,7 @@ EAC16CF3590B3A602F4BC2D0 = { isa = PBXBuildFile; productRef = 0E5A1CF01B3801E712
 D6F6C4912B19A0DF5B92D3FE = { isa = PBXBuildFile; productRef = 2B8EFABC3A5E8B9185C25302; };
 34F7348D3C8AC3647DF68716 = { isa = XCSwiftPackageProductDependency; productName = EngineMetal; package = 582681C2EAE02B3F3D399C0C; };
 683B66E730CFEDD93B4D7E09 = { isa = PBXBuildFile; productRef = 34F7348D3C8AC3647DF68716; };
-971ED9D05B25DB6C4D7680D4 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (405DB3B6A50F3DB3499978AC,); runOnlyForDeploymentPostprocessing = 0; };
+971ED9D05B25DB6C4D7680D4 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (405DB3B6A50F3DB3499978AC, A20000000000000000000002,); runOnlyForDeploymentPostprocessing = 0; };
 78AE8C6BEB2A40A6D824CCEE = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (EAC16CF3590B3A602F4BC2D0, 860E009E86CC3F065065E892,); runOnlyForDeploymentPostprocessing = 0; };
 364863F9F2E558B0F50473FC = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (806A071F1903536645D59842,); runOnlyForDeploymentPostprocessing = 0; };
 6E431EB0650617AA1756B320 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (05BBB95E952922A70F388E50, 47F3D17B87012BAAD2DFFD44, A10000000000000000000002,); runOnlyForDeploymentPostprocessing = 0; };

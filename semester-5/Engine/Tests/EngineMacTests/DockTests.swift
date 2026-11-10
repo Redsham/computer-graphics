@@ -133,6 +133,45 @@ final class DockTests: XCTestCase {
 }
 
 @MainActor final class DockWindowTests: XCTestCase {
+    func testCommandGroupsPreserveRegistrationValidationAndCustomCommands() throws {
+        guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
+            throw XCTSkip("Metal 4 GPU required")
+        }
+
+        let name = "GraphicsEngine.CommandTests.\(UUID().uuidString)"
+        let session = try EngineSession(
+            defaultsData: JSONEncoder().encode(EngineConfiguration()), settingsName: name, systems: [])
+        defer {
+            session.shutdown()
+            if let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+                .first
+            {
+                try? FileManager.default.removeItem(at: support.appending(path: name))
+            }
+        }
+
+        XCTAssertEqual(
+            Set(session.commands.names),
+            Set([
+                "help", "echo", "clear", "pause", "resume", "step", "capture", "reset", "get", "set",
+                "stats", "profile", "passes", "entities", "log", "trace",
+            ]))
+        session.executeCommand("set exposure 2")
+        XCTAssertEqual(session.configuration.exposure, 2)
+        session.executeCommand("set exposure nan")
+        XCTAssertEqual(session.configuration.exposure, 2)
+        XCTAssertEqual(session.log.entries.last?.level, .error)
+        session.executeCommand("pause")
+        XCTAssertTrue(session.simulationPaused)
+        session.executeCommand("resume")
+        XCTAssertFalse(session.simulationPaused)
+        session.executeCommand("profile off")
+        XCTAssertFalse(session.renderer.profilingEnabled)
+        session.commands.register("lab.status", help: "Custom lab command") { _ in "Lab ready" }
+        session.executeCommand("lab.status")
+        XCTAssertEqual(session.log.entries.last?.message, "Lab ready")
+    }
+
     func testDockDividersResizePanesWithoutStretchingHeaders() throws {
         guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
             throw XCTSkip("Metal 4 GPU required for EngineSession")

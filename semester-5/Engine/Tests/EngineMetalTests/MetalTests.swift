@@ -103,6 +103,96 @@ import simd
 }
 
 extension MetalTests {
+    func testPreparationFailureRepreparesPreviouslyValidConfiguration() throws {
+        guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
+            throw XCTSkip("Metal 4 required")
+        }
+
+        XCTAssertThrowsError(try MetalRenderer(passes: []))
+        let forward = InstrumentedForwardPass()
+        let renderer = try MetalRenderer(passes: [forward, RejectMSAAOutputPass()])
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb, width: 32, height: 32, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.renderTarget]
+        let surface = try XCTUnwrap(renderer.metal.device.makeTexture(descriptor: descriptor))
+        var configuration = EngineConfiguration()
+        configuration.sampleCount = 4
+        XCTAssertThrowsError(
+            try renderer.render(
+                snapshot: RenderSnapshot(), configuration: configuration, surface: surface))
+        configuration.sampleCount = 1
+        try renderer.render(snapshot: RenderSnapshot(), configuration: configuration, surface: surface)
+        try renderer.waitUntilIdle()
+        XCTAssertEqual(forward.preparations, 3)
+        XCTAssertEqual(renderer.lastSubmittedFrameID, 1)
+    }
+
+    func testObjectBufferGrowthCapturesActiveRangeAndReusesSlots() throws {
+        guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
+            throw XCTSkip("Metal 4 required")
+        }
+
+        let renderer = try MetalRenderer()
+        let cube = try renderer.resources.makeCube()
+        let material = renderer.resources.makeMaterial(Material(baseColor: .one))
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb, width: 32, height: 32, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.renderTarget, .shaderRead]
+        let surface = try XCTUnwrap(renderer.metal.device.makeTexture(descriptor: descriptor))
+        var snapshot = RenderSnapshot()
+        snapshot.objects = Array(
+            repeating: RenderObject(
+                mesh: cube, material: material, model: Math.scale(SIMD3(repeating: 0.1))), count: 600)
+        try renderer.requestCapture()
+        try renderer.render(snapshot: snapshot, configuration: EngineConfiguration(), surface: surface)
+        let capture = try XCTUnwrap(renderer.lastCapture)
+        let objects = try XCTUnwrap(capture.passes[0].buffers.first { $0.name == "Objects" })
+        XCTAssertEqual(objects.bytes.count, 600 * 144)
+        XCTAssertGreaterThanOrEqual(objects.allocationLength, objects.bytes.count)
+
+        snapshot.objects.removeAll()
+        for _ in 0..<5 {
+            try renderer.render(snapshot: snapshot, configuration: EngineConfiguration(), surface: surface)
+        }
+        try renderer.waitUntilIdle()
+        XCTAssertEqual(renderer.profiles.frames.last?.drawCount, 1)
+    }
+
+    func testPassExtensionPreparationAndCaptureRemainIndependentOfCoordinator() throws {
+        guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
+            throw XCTSkip("Metal 4 required")
+        }
+
+        let pass = InstrumentedForwardPass()
+        let renderer = try MetalRenderer(passes: [pass, OutputPass()])
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb, width: 32, height: 32, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = [.renderTarget, .shaderRead]
+        let surface = try XCTUnwrap(renderer.metal.device.makeTexture(descriptor: descriptor))
+        var configuration = EngineConfiguration()
+
+        for _ in 0..<5 {
+            try renderer.render(snapshot: RenderSnapshot(), configuration: configuration, surface: surface)
+        }
+
+        try renderer.waitUntilIdle()
+        XCTAssertEqual(pass.preparations, 1)
+        XCTAssertEqual(pass.framePreparations, 5)
+        configuration.sampleCount = 4
+        try renderer.requestCapture()
+        try renderer.render(snapshot: RenderSnapshot(), configuration: configuration, surface: surface)
+        XCTAssertEqual(pass.preparations, 2)
+        XCTAssertEqual(pass.framePreparations, 6)
+        let capture = try XCTUnwrap(renderer.lastCapture)
+        let buffer = try XCTUnwrap(capture.passes[0].buffers.first { $0.name == "Custom pass data" })
+        XCTAssertEqual(buffer.bytes.count, 16)
+        XCTAssertTrue(buffer.bytes.allSatisfy { $0 == 7 })
+        XCTAssertEqual(capture.passes.map(\.name), ["Forward", "Output"])
+    }
+
     func testDebuggerPreservesPassTexturesBuffersMSAASamplesAndTimestamps() throws {
         guard MTLCreateSystemDefaultDevice()?.supportsFamily(.metal4) == true else {
             throw XCTSkip("Metal 4 required")
@@ -160,6 +250,58 @@ extension MetalTests {
         let roundtrip = try JSONDecoder.isoDates.decode(FrameCapture.self, from: encoded)
         XCTAssertEqual(roundtrip.passes[0].buffers[0].bytes, capture.passes[0].buffers[0].bytes)
         XCTAssertFalse(renderer.captureRequested)
+    }
+}
+
+@MainActor private final class InstrumentedForwardPass: RenderPass {
+    private let forward = ForwardPass()
+    private var buffer: (any MTLBuffer)?
+    private(set) var preparations = 0
+    private(set) var framePreparations = 0
+
+    func declaration(configuration: EngineConfiguration) -> PassDeclaration {
+        forward.declaration(configuration: configuration)
+    }
+
+    func prepare(_ context: PassPreparationContext) throws {
+        preparations += 1
+        try forward.prepare(context)
+        if buffer == nil {
+            buffer = context.metal.device.makeBuffer(length: 16, options: .storageModeShared)
+            buffer?.contents().initializeMemory(as: UInt8.self, repeating: 7, count: 16)
+        }
+    }
+
+    func prepareFrame(_ context: PassContext) throws {
+        framePreparations += 1
+        let buffer = try XCTUnwrap(buffer)
+        context.frame.useResource(buffer)
+        if context.frame.isCapturing {
+            context.frame.inspectBuffer("Custom pass data", buffer: buffer)
+        }
+    }
+
+    func encode(_ context: PassContext) throws {
+        try forward.encode(context)
+    }
+}
+
+@MainActor private final class RejectMSAAOutputPass: RenderPass {
+    private let output = OutputPass()
+
+    func declaration(configuration: EngineConfiguration) -> PassDeclaration {
+        output.declaration(configuration: configuration)
+    }
+
+    func prepare(_ context: PassPreparationContext) throws {
+        guard context.configuration.sampleCount == 1 else {
+            throw EngineError.invalidPipeline("Test preparation failure")
+        }
+        try output.prepare(context)
+    }
+
+    func encode(_ context: PassContext) throws {
+        try output.encode(context)
     }
 }
 
