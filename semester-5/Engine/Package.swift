@@ -18,5 +18,6 @@ let package = Package(
         .target(name: "EngineMac", dependencies: ["EngineCore", "EngineMetal"]),
         .testTarget(name: "EngineCoreTests", dependencies: ["EngineCore"]),
         .testTarget(name: "EngineMetalTests", dependencies: ["EngineCore", "EngineMetal"]),
+        .testTarget(name: "EngineMacTests", dependencies: ["EngineMac"]),
     ]
 )

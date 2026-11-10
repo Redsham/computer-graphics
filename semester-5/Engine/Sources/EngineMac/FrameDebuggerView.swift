@@ -7,8 +7,8 @@ import SwiftUI
 
 @MainActor struct FrameDebuggerPanel: View {
     @ObservedObject var session: EngineSession
-    @State private var passID: Int? = 0
-    @State private var resourceID = ""
+
+    @ObservedObject var state: FrameDebuggerViewState
 
     var body: some View {
         if let capture = session.capturedFrame {
@@ -22,7 +22,7 @@ import SwiftUI
                     )
                     .font(.caption.monospaced())
 
-                    List(selection: $passID) {
+                    List(selection: $state.passID) {
                         ForEach(capture.passes) { pass in
                             VStack(alignment: .leading) {
                                 Text("\(pass.id + 1). \(pass.name)")
@@ -50,7 +50,7 @@ import SwiftUI
                 Divider()
 
                 if let pass = capture.passes.first(where: {
-                    $0.id == passID
+                    $0.id == state.passID
                 }) ?? capture.passes.first {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
@@ -69,7 +69,7 @@ import SwiftUI
                                         selectedID(pass)
                                     },
                                     set: {
-                                        resourceID = $0
+                                        state.resourceID = $0
                                     })
                             ) {
                                 ForEach(pass.textures) {
@@ -93,7 +93,7 @@ import SwiftUI
                                 texture: texture,
                                 export: {
                                     session.exportTexture(texture)
-                                }
+                                }, state: state.texture(texture.id)
                             )
                             .id(
                                 texture.id)
@@ -104,7 +104,7 @@ import SwiftUI
                                 buffer: buffer,
                                 export: {
                                     session.exportBuffer(buffer)
-                                }
+                                }, state: state.buffer(buffer.id)
                             )
                             .id(
                                 buffer.id)
@@ -113,10 +113,8 @@ import SwiftUI
                     .padding(10)
                 }
             }
-            .onChange(of: capture.id) {
-                passID = 0
-                resourceID = ""
-            }
+            .onAppear { state.accept(captureID: capture.id) }
+            .onChange(of: capture.id) { state.accept(captureID: capture.id) }
         } else {
             ContentUnavailableView {
                 Label("No captured frame", systemImage: "camera.viewfinder")
@@ -134,13 +132,13 @@ import SwiftUI
 
     private func selectedID(_ pass: CapturedPass) -> String {
         if pass.textures.contains(where: {
-            $0.id == resourceID
+            $0.id == state.resourceID
         })
             || pass.buffers.contains(where: {
-                $0.id == resourceID
+                $0.id == state.resourceID
             })
         {
-            return resourceID
+            return state.resourceID
         }
 
         return pass.textures.first?.id ?? pass.buffers.first?.id ?? ""
@@ -152,18 +150,11 @@ import SwiftUI
 @MainActor private struct TextureInspector: View {
     let texture: CapturedTexture
     let export: () -> Void
-    @State private var sample = 0
-    @State private var channel = "RGB"
-    @State private var autoRange = false
-    @State private var zoom: CGFloat = 1
-    @State private var exposure: Double = 1
-    @State private var pixelX = 0
-    @State private var pixelY = 0
     @State private var image: NSImage?
     @State private var rendering = false
 
     private var taskID: String {
-        "\(texture.id).\(sample).\(channel).\(autoRange).\(exposure)"
+        "\(texture.id).\(state.sample).\(state.channel).\(state.autoRange).\(state.exposure)"
     }
 
     private var previewWidth: Int {
@@ -177,6 +168,8 @@ import SwiftUI
     private var previewScale: CGFloat {
         min(1, 150 / CGFloat(previewHeight))
     }
+
+    @ObservedObject var state: TextureViewState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -200,7 +193,7 @@ import SwiftUI
             }
 
             HStack {
-                Picker("Channel", selection: $channel) {
+                Picker("Channel", selection: $state.channel) {
                     ForEach(["RGB", "R", "G", "B", "A"], id: \.self) {
                         Text($0)
                             .tag($0)
@@ -209,7 +202,7 @@ import SwiftUI
                 .frame(width: 125)
 
                 if texture.samples > 1 {
-                    Picker("Sample", selection: $sample) {
+                    Picker("Sample", selection: $state.sample) {
                         ForEach(0..<texture.samples, id: \.self) {
                             Text("\($0)")
                                 .tag($0)
@@ -218,9 +211,9 @@ import SwiftUI
                     .frame(width: 110)
                 }
 
-                Toggle("Auto range", isOn: $autoRange)
+                Toggle("Auto range", isOn: $state.autoRange)
 
-                Picker("Zoom", selection: $zoom) {
+                Picker("Zoom", selection: $state.zoom) {
                     Text("1×")
                         .tag(CGFloat(1))
 
@@ -235,7 +228,7 @@ import SwiftUI
                 Text("Exposure")
                     .font(.caption)
 
-                Slider(value: $exposure, in: 0.1...8)
+                Slider(value: $state.exposure, in: 0.1...8)
                     .frame(width: 90)
 
                 if rendering {
@@ -251,24 +244,24 @@ import SwiftUI
                             .resizable()
                             .interpolation(.none)
                             .frame(
-                                width: CGFloat(previewWidth) * previewScale * zoom,
-                                height: CGFloat(previewHeight) * previewScale * zoom
+                                width: CGFloat(previewWidth) * previewScale * state.zoom,
+                                height: CGFloat(previewHeight) * previewScale * state.zoom
                             )
                             .onContinuousHover { phase in
                                 if case .active(let point) = phase {
-                                    pixelX = min(
+                                    state.pixelX = min(
                                         texture.width - 1,
                                         max(
                                             0,
                                             Int(
-                                                point.x / (CGFloat(previewWidth) * previewScale * zoom)
+                                                point.x / (CGFloat(previewWidth) * previewScale * state.zoom)
                                                     * CGFloat(texture.width))))
-                                    pixelY = min(
+                                    state.pixelY = min(
                                         texture.height - 1,
                                         max(
                                             0,
                                             Int(
-                                                point.y / (CGFloat(previewHeight) * previewScale * zoom)
+                                                point.y / (CGFloat(previewHeight) * previewScale * state.zoom)
                                                     * CGFloat(texture.height)))
                                     )
                                 }
@@ -289,17 +282,17 @@ import SwiftUI
                     HStack {
                         Text("X")
 
-                        TextField("X", value: $pixelX, format: .number)
+                        TextField("X", value: $state.pixelX, format: .number)
                             .frame(width: 50)
 
                         Text("Y")
 
-                        TextField("Y", value: $pixelY, format: .number)
+                        TextField("Y", value: $state.pixelY, format: .number)
                             .frame(width: 50)
                     }
                     .textFieldStyle(.roundedBorder)
 
-                    if let value = texture.pixel(x: pixelX, y: pixelY, sample: sample) {
+                    if let value = texture.pixel(x: state.pixelX, y: state.pixelY, sample: state.sample) {
                         ForEach(0..<4) { index in
                             Text(String(format: "%@  %.7g", ["R", "G", "B", "A"][index], value[index]))
                                 .font(
@@ -328,10 +321,10 @@ import SwiftUI
 
             rendering = true
             let captured = texture
-            let chosenSample = sample
-            let chosenChannel = channel
-            let range = autoRange
-            let gain = exposure
+            let chosenSample = state.sample
+            let chosenChannel = state.channel
+            let range = state.autoRange
+            let gain = state.exposure
             let task = Task.detached(priority: .userInitiated) {
                 previewRGBA(
                     captured, sample: chosenSample, channel: chosenChannel, autoRange: range, exposure: gain)
@@ -443,8 +436,8 @@ private func previewRGBA(
 @MainActor private struct BufferInspector: View {
     let buffer: CapturedBuffer
     let export: () -> Void
-    @State private var page = 0
-    @State private var interpretation = "Float32"
+
+    @ObservedObject var state: BufferViewState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -456,7 +449,7 @@ private func previewRGBA(
 
                 Spacer()
 
-                Picker("Decode", selection: $interpretation) {
+                Picker("Decode", selection: $state.interpretation) {
                     ForEach(["Float32", "UInt32", "Float16", "UInt8"], id: \.self) {
                         Text($0)
                             .tag($0)
@@ -465,7 +458,7 @@ private func previewRGBA(
                 .frame(width: 170)
 
                 Stepper(
-                    "Page \(page + 1)/\(max(1,(buffer.bytes.count + 255)/256))", value: $page,
+                    "Page \(state.page + 1)/\(max(1,(buffer.bytes.count + 255)/256))", value: $state.page,
                     in: 0...max(0, (buffer.bytes.count - 1) / 256)
                 )
                 .frame(width: 180)
@@ -491,7 +484,9 @@ private func previewRGBA(
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(
                         Array(
-                            stride(from: page * 256, to: min(buffer.bytes.count, page * 256 + 256), by: 16)),
+                            stride(
+                                from: state.page * 256, to: min(buffer.bytes.count, state.page * 256 + 256),
+                                by: 16)),
                         id: \.self
                     ) { offset in
                         let end = min(buffer.bytes.count, offset + 16)
@@ -514,9 +509,9 @@ private func previewRGBA(
     }
 
     private func decode(offset: Int, end: Int) -> String {
-        let size = interpretation == "UInt8" ? 1 : (interpretation == "Float16" ? 2 : 4)
+        let size = state.interpretation == "UInt8" ? 1 : (state.interpretation == "Float16" ? 2 : 4)
         return stride(from: offset, through: end - size, by: size).map { position -> String in
-            switch interpretation {
+            switch state.interpretation {
             case "UInt8":
                 return "\(buffer.bytes[position])"
             case "Float16":

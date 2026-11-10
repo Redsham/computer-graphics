@@ -16,8 +16,8 @@ import os
 
     // MARK: - Diagnostics state
 
-    @Published public var diagnosticsVisible = true
-    @Published public var diagnosticsTab = "Console"
+    public let settingsName: String
+    weak var diagnosticsDock: DiagnosticsDock?
     @Published public internal(set) var logEntries: [LogEntry] = []
     @Published public internal(set) var profileFrames: [FrameProfile] = []
     @Published public internal(set) var capturedFrame: FrameCapture?
@@ -60,6 +60,7 @@ import os
         defaultsData: Data, settingsName: String, systems: [any EngineSystem],
         passes: [any RenderPass] = [ForwardPass(), OutputPass()], enableShaderLogging: Bool = false
     ) throws {
+        self.settingsName = settingsName
         let support = try FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         store = try ConfigurationStore(
@@ -147,8 +148,7 @@ import os
             if capturing {
                 capturedFrame = renderer.lastCapture
                 simulationPaused = true
-                diagnosticsTab = "Frame"
-                diagnosticsVisible = true
+                diagnosticsDock?.show(.frame)
             }
 
             if stepRequested {

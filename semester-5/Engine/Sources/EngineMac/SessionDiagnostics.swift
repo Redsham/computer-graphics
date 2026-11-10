@@ -29,7 +29,7 @@ extension EngineSession {
     }
 
     public func stepFrame() {
-        if diagnosticsTab == "Frame", capturedFrame != nil {
+        if diagnosticsDock?.layout.isVisible(.frame) == true, capturedFrame != nil {
             do {
                 try renderer.requestCapture()
             } catch {

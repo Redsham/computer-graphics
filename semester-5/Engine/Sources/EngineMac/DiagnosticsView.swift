@@ -8,6 +8,7 @@ import SwiftUI
 
 @MainActor struct DiagnosticsToolbar: View {
     @ObservedObject var session: EngineSession
+    @ObservedObject var dock: DiagnosticsDock
 
     var body: some View {
         HStack(spacing: 12) {
@@ -37,6 +38,21 @@ import SwiftUI
                 session.exportGPUTrace()
             }
 
+            Menu {
+                ForEach(DockPanel.allCases) { panel in
+                    Menu(panel.title) {
+                        Button("Show panel") { dock.show(panel) }
+                        DockPanelActions(dock: dock, panel: panel)
+                    }
+                }
+
+                Divider()
+
+                Button("Restore default layout") { dock.reset() }
+            } label: {
+                Label("Panels", systemImage: "rectangle.3.group")
+            }
+
             Spacer()
 
             if session.simulationPaused {
@@ -46,7 +62,7 @@ import SwiftUI
             }
 
             Button {
-                session.diagnosticsVisible.toggle()
+                dock.toggleDiagnostics()
             } label: {
                 Label("Diagnostics", systemImage: "terminal")
             }
@@ -58,64 +74,13 @@ import SwiftUI
     }
 }
 
-@MainActor struct DiagnosticsPanel: View {
-    @ObservedObject var session: EngineSession
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Picker("Diagnostics", selection: $session.diagnosticsTab) {
-                    ForEach(["Console", "Log", "Profiler", "Frame"], id: \.self) {
-                        Text($0)
-                            .tag($0)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 380)
-
-                Spacer()
-
-                Text(session.log.fileURL?.lastPathComponent ?? "Memory log")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button("Export log…") {
-                    session.exportLog()
-                }
-
-                Button("Clear log") {
-                    session.log.clear()
-
-                    session.refreshDiagnostics()
-                }
-            }
-            .padding(10)
-
-            Divider()
-
-            switch session.diagnosticsTab {
-            case "Console":
-                ConsolePanel(session: session)
-            case "Log":
-                LogPanel(session: session)
-            case "Profiler":
-                ProfilerPanel(session: session)
-            default:
-                FrameDebuggerPanel(session: session)
-            }
-        }
-        .background(.background)
-    }
-}
-
 // MARK: - Console
 
-@MainActor private struct ConsolePanel: View {
+@MainActor struct ConsolePanel: View {
     @ObservedObject var session: EngineSession
-    @State private var input = ""
-    @State private var historyIndex: Int?
-    @State private var suggestions = ""
     @FocusState private var focused: Bool
+
+    @ObservedObject var state: ConsoleViewState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -123,8 +88,8 @@ import SwiftUI
 
             Divider()
 
-            if !suggestions.isEmpty {
-                Text(suggestions)
+            if !state.suggestions.isEmpty {
+                Text(state.suggestions)
                     .font(.caption.monospaced())
                     .frame(
                         maxWidth: .infinity, alignment: .leading
@@ -137,15 +102,15 @@ import SwiftUI
                     .foregroundStyle(.mint)
                     .font(.system(.body, design: .monospaced))
 
-                TextField("help · command history ↑/↓ · complete Tab", text: $input)
+                TextField("help · command history ↑/↓ · complete Tab", text: $state.input)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .monospaced))
                     .focused($focused)
                     .onSubmit {
-                        session.executeCommand(input)
-                        input = ""
-                        suggestions = ""
-                        historyIndex = nil
+                        session.executeCommand(state.input)
+                        state.input = ""
+                        state.suggestions = ""
+                        state.historyIndex = nil
                     }
                     .onKeyPress(.upArrow) {
                         let history = session.commands.history
@@ -154,35 +119,35 @@ import SwiftUI
                             return .handled
                         }
 
-                        let index = max(0, (historyIndex ?? history.count) - 1)
-                        historyIndex = index
-                        input = history[index]
+                        let index = max(0, (state.historyIndex ?? history.count) - 1)
+                        state.historyIndex = index
+                        state.input = history[index]
                         return .handled
                     }
                     .onKeyPress(.downArrow) {
                         let history = session.commands.history
-                        let index = min(history.count, (historyIndex ?? history.count) + 1)
-                        historyIndex = index
-                        input = index < history.count ? history[index] : ""
+                        let index = min(history.count, (state.historyIndex ?? history.count) + 1)
+                        state.historyIndex = index
+                        state.input = index < history.count ? history[index] : ""
                         return .handled
                     }
                     .onKeyPress(.tab) {
-                        let matches = session.commands.completions(input)
+                        let matches = session.commands.completions(state.input)
 
                         if matches.count == 1 {
-                            input = matches[0] + " "
-                            suggestions = ""
+                            state.input = matches[0] + " "
+                            state.suggestions = ""
                         } else {
-                            suggestions = matches.joined(separator: "  ")
+                            state.suggestions = matches.joined(separator: "  ")
                         }
 
                         return .handled
                     }
 
                 Button("Run") {
-                    session.executeCommand(input)
-                    input = ""
-                    historyIndex = nil
+                    session.executeCommand(state.input)
+                    state.input = ""
+                    state.historyIndex = nil
                 }
             }
             .padding(12)
@@ -192,20 +157,18 @@ import SwiftUI
 
 // MARK: - Log viewer
 
-@MainActor private struct LogPanel: View {
+@MainActor struct LogPanel: View {
     @ObservedObject var session: EngineSession
-    @State private var search = ""
-    @State private var minimum = LogLevel.debug
-    @State private var follow = true
-    @State private var frozen: [LogEntry]?
+
+    @ObservedObject var state: LogViewState
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                TextField("Search category or message", text: $search)
+                TextField("Search category or message", text: $state.search)
                     .textFieldStyle(.roundedBorder)
 
-                Picker("Minimum", selection: $minimum) {
+                Picker("Minimum", selection: $state.minimum) {
                     ForEach(LogLevel.allCases, id: \.self) {
                         Text($0.rawValue)
                             .tag($0)
@@ -213,20 +176,20 @@ import SwiftUI
                 }
                 .frame(width: 180)
 
-                Toggle("Follow", isOn: $follow)
+                Toggle("Follow", isOn: $state.follow)
 
-                Button(frozen == nil ? "Freeze display" : "Live display") {
-                    frozen = frozen == nil ? session.logEntries : nil
+                Button(state.frozen == nil ? "Freeze display" : "Live display") {
+                    state.frozen = state.frozen == nil ? session.logEntries : nil
                 }
             }
             .padding(8)
 
             LogRows(
-                entries: (frozen ?? session.logEntries).filter {
-                    $0.level.rank >= minimum.rank
-                        && (search.isEmpty
-                            || "\($0.category) \($0.message)".localizedCaseInsensitiveContains(search))
-                }, follow: follow)
+                entries: (state.frozen ?? session.logEntries).filter {
+                    $0.level.rank >= state.minimum.rank
+                        && (state.search.isEmpty
+                            || "\($0.category) \($0.message)".localizedCaseInsensitiveContains(state.search))
+                }, follow: state.follow)
         }
     }
 }
@@ -292,29 +255,29 @@ import SwiftUI
 
 // MARK: - Profiler
 
-@MainActor private struct ProfilerPanel: View {
+@MainActor struct ProfilerPanel: View {
     @ObservedObject var session: EngineSession
-    @State private var frozen: [FrameProfile]?
-    @State private var selectedFrameID: UInt64?
 
     private var frames: [FrameProfile] {
-        frozen ?? session.profileFrames
+        state.frozen ?? session.profileFrames
     }
 
     private var latest: FrameProfile? {
         frames.first(where: {
-            $0.id == selectedFrameID
+            $0.id == state.selectedFrameID
         }) ?? frames.last(where: {
             $0.gpuMilliseconds != nil
         }) ?? frames.last
     }
 
+    @ObservedObject var state: ProfilerViewState
+
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Button(frozen == nil ? "Freeze profiler" : "Live profiler") {
-                        frozen = frozen == nil ? session.profileFrames : nil
+                    Button(state.frozen == nil ? "Freeze profiler" : "Live profiler") {
+                        state.frozen = state.frozen == nil ? session.profileFrames : nil
                     }
 
                     Button("Export…") {
@@ -347,7 +310,7 @@ import SwiftUI
                             .foregroundStyle(by: .value("Stage", "GPU"))
                     }
                 }
-                .chartXSelection(value: $selectedFrameID)
+                .chartXSelection(value: $state.selectedFrameID)
                 .chartYAxisLabel("ms")
                 .chartLegend(position: .bottom)
                 .frame(minHeight: 115)
