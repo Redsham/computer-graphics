@@ -35,13 +35,29 @@ import SwiftUI
             }
 
             Menu {
-                ForEach(DockPanel.allCases) { panel in
+                ForEach([DockPanel.console, .settings]) { panel in
+                    Button(panel.title) {
+                        dock.show(panel)
+                    }
+                }
+
+                Divider()
+
+                Button("Restore default layout") {
+                    dock.reset()
+                }
+            } label: {
+                Label("Panels", systemImage: "rectangle.3.group")
+            }
+
+            Menu {
+                ForEach([DockPanel.profiler, .frame]) { panel in
                     Button(panel.title) {
                         dock.show(panel)
                     }
                 }
             } label: {
-                Label("Panels", systemImage: "rectangle.3.group")
+                Label("Analysis", systemImage: "chart.xyaxis.line")
             }
 
             Spacer()
